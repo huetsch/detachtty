@@ -1,0 +1,139 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH DETACHTTY 1 "May 31, 2001"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+detachtty, attachtty \- run an interactive program with io to a unix-domain socket
+.SH SYNOPSIS
+.B detachtty
+.RI [ --no-detach ]
+.RI [ --dribble-file \ \ dribblename ] 
+.RI [ --log-file \ \ name ] 
+.RI [ --pid-file \ \ pidname ] 
+.I socket-path command 
+.RI [ arguments-to-command ] ...
+.br
+.B attachtty 
+.I /var/run/cliki-socket
+.br
+.B attachtty 
+.I username@f.q.d.n:/var/run/cliki-socket
+.SH DESCRIPTION
+.B detachtty 
+lets you run interactive programs non-interactively, and connect to
+them (optionally over the network) when you do need to interact with them.
+\fIcommand\fR is run on a pseudo-terminal, and data is copied between it
+and a unix(7)-domain socket named \fIsocket-path\fR.  \fIcommand\fR
+runs with the current user's permissions and environment variables.
+.PP
+.B attachtty
+is used to connect to a process running under detachtty.  It copies
+between \fIsocket-path\fR and stdin/out.  It also catches SIGINT and
+arranges for it to be forwarded to the \fIcommand\fR, so the user may
+use Control-C in the usual fashion.
+.P 
+If you've used screen, it's a similar concept.  Compared to screen,
+detachtty has
+.PP
+ * no capability to swap between different screens (it doesn't co-opt C-a)
+.PP
+ * no tty emulation (you can sanely use it in emacs comint modes)
+.PP
+ * no features (less to go wrong)
+.PP
+ * no configuration file
+.PP
+ * ability to spawn ssh to securely connect across the network
+
+
+.SH OPTIONS
+These programs approximately follow the usual GNU command line syntax,
+using long options that start with two dashes (`--').  For \fBdetachtty\fR,
+the options are
+
+.TP
+.B \-\-no\-detach
+Don't fork into the background.  Useful if you wish to start the
+program from inittab(5)
+.TP
+.BI \-\-dribble\-file \ \ dribblename
+All input from and to the program being run is copied into 
+.I dribblename
+(if unspecified, it is discarded)
+.TP
+.BI \-\-log\-file \ \ name
+Status messages (client connects, disconnects, errors) are sent to
+.I name
+(if unspecified, they go to standard error)
+.TP 
+.BI \-\-pid\-file \ \ pidname
+The process ID of detachtty is written to 
+.I pidname.
+See \fBSIGNALS\fR
+.TP
+.I socket-path
+The unix-domain socket.  If access to \fIcommand\fR should be in any
+way restricted, so should this socket - i.e. it is recommended that
+you put it in a mode 700 directory.
+.TP 
+.I command arguments
+The command to run (which is searched for in the normal way).  All
+remaining command line parameters are passed to it as arguments
+.P
+.B attachtty
+takes a single argument, which is either the path to
+\fIsocket-path\fR, or a "remote path" of the form 
+.IR username @ host : socket-path
+where 
+.IR username @ host 
+is passed to ssh.  No provision is made to accept password input,
+so ssh must be able to make a connection without needing it.  See 
+.BR ssh-agent (1)
+.P
+To detach from the tty without exiting from the server process, send
+attachtty any signal that it doesn't catch.  See the SIGNALS section
+.P
+.SH NOTES
+.P
+detachtty does not search the user's PATH environment variable for the
+program to execute, so a full pathname must be provided.
+.P
+If you get an immediate "Child terminated, exiting" message from
+detachtty, this usually means that the program you specified was not
+found or could not be executed (on Linux 2.4,
+.BR execve (1)
+succeeds even if it didn't, so to speak).
+.P
+You will probably go insane a lot more slowly if you use absolute 
+pathnames for all filename arguments.
+.P
+.SH SIGNALS
+.P 
+Sending \fBSIGHUP\fR to the process identified by \fIpidname\fR
+will cause detachtty to close and reopen its log files.
+.P
+Sending \fBSIGQUIT\fR to an \fIattachtty\fR process (usually from the
+keyboard with ^\\) will cause it to detach from the tty and quit leaving
+the server process running.  Sometimes you need to press it twice
+.SH SEE ALSO
+.BR screen (1),
+.BR ssh (1),
+.BR ssh-agent (1),
+.BR sbcl (1).
+.br
+.SH AUTHOR
+Written by Daniel Barlow <dan@telent.net>, and a cast of units.
+
