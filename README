@@ -1,0 +1,126 @@
+-*- Text -*- is good.
+
+  			    detachtty
+
+detachtty lets you run interactive programs non-interactively, and
+connect to them over the network when you do need to interact with them.
+
+If you've used screen, it's a similar concept.  Compared to screen,
+detachtty has
+
+ * no capability to swap between different screens (it doesn't co-opt C-a)
+ * no tty emulation (you can sanely use it in emacs comint modes)
+ * no features (less to go wrong)
+ * no configuration file
+ * ability to spawn ssh to securely connect across the network
+
+* What it's for - a likely usage scenario
+
+I have a persistent server implemented in Lisp.  Usually it sits there
+serving things, but sometimes (for example when a new version is
+available and it needs to be upgraded) I need to connect to it and
+type Lisp at it.
+
+Why don't I use screen?  I could - I used to do exactly that - but
+then I have to talk directly to the CMUCL repl, which means no command
+line editing.  I want to use ILISP, but (1) screen's terminal handling
+is likely to confuse Emacs, (2) screen isn't network-enabled and the
+server machine doesn't have Emacs installed anyway.
+
+* How it works:
+
+detachtty has two parts: 
+
+** detachtty  - the server
+
+opens a pseudoterminal and starts your program on the slave end.  It
+then copies between that tty and a unix-domain socket whose location
+you specify when you start it
+
+detachtty has options to fork into the background, to specify the
+socket location, and to govern the placement of its log file and of
+the dribble file from the application underneath it
+
+** attachtty  - the client
+
+When you want to connect to the process, attachtty attaches to the
+unix-domain socket and copies input/output to and from you.  
+
+If you have ssh installed and set up, you can also use attachtty
+across the network.  This requires 
+
+- that you also have attachtty installed on the machine that you are
+  running detachtty on, and that it's somewhere on the path
+
+- that you have ssh set up not to need to ask for a password (e.g
+  using ssh-agent)
+
+It's often nice to be able to interrupt a process, especially when
+it's stuck in some kind of loop.  attachtty catches SIGINT and sends
+the character \003 into the pty master, which causes the controlled
+process to get a SIGINT of its own.  This works at least for using
+with ILISP and CMUCL.
+
+* Using it - an example
+
+server$ detachtty --help
+detachtty: unrecognized option `--help'
+usage: 
+ detachtty [--no-detach] [--dribble-file name] [--log-file name] \
+   [--pid-file name] socket-path command [arg] [arg] [arg] ...
+
+server$ detachtty --dribble-file /var/log/cliki-dribble --log-file \
+  /var/log/detachtty.log --pid-file /var/run/cliki.pid \
+  /var/run/cliki-socket /usr/bin/lisp -eval '(load-system :telentweb)' \
+  -eval '(progn (telentweb::init) (telentweb::start))' \
+
+client$ attachtty dan@server:/var/run/cliki-socket
+
+** Signals and log files
+
+When detachtty receives a SIGHUP, it closes and reopens its log and dribble
+files, so it should play nice with whatever log rotation tools you already
+use.  Note that the dribble file especially can grow large quite quickly  
+
+The SIGHUP should be sent to detachtty, not to the child.  What the child
+does with signals depends entirely on what the child is ...
+
+
+* Security considerations
+
+- detachtty performs no authentication of who's attached.  You choose
+where the socket is created in the filesystem, so choose somewhere
+that other people can't get to.
+
+(detachtty creates its socket with mode 0700.  Some Unix systems -
+Linux among them - honour file permissions on sockets, so only the
+original user or root will be able to connect to it.  However, "many
+BSD derived systems [...] ignore permissions for Unix sockets" so you
+need to check if this will help you or not.)
+
+- communication across the net is done using ssh.  If there is a
+program on your computer called "ssh", then whatever level of security
+it provides is available here
+
+- no serious effort has been made to examine the attachtty and
+detachtty code for buffer overruns etc.  If you are planning on using
+these setuid or in some other untrusted-user situation, now is the
+time to think of an alternative plan.
+
+
+* Where to get it
+
+detachtty is part of the Debian GNU/Linux system.  Debian "woody" and
+"sid" users should find that "apt-get install detachtty" will download
+and install it for them.
+
+Users of other platforms are invited to check the CLiki page at
+<URL:http://ww.telent.net/cliki/detachtty> which should always contain
+a link to a download location.
+
+
+* Feedback, feature requests, patches
+
+to dan@telent.net, or using the Debian bug tracking system (bug reports 
+can be sent to the BTS even if you're not using Debian; it's exactly
+the same package either way), or leave a note on the CLiki page
