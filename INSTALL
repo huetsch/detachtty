@@ -1,0 +1,41 @@
+
+INSTALLATION
+
+The Makefile apparently requires GNU Make; if you have some other Make
+program, you'll need to edit it by hand - or install GNU Make, of course.
+
+vi Makefile
+make
+make install
+
+... or on a Debian (woody, sid, or later) box:
+
+apt-get install detachtty
+
+This is a native Debian package, which means that if you are having
+trouble with the Debian version there is usually little point in
+trying the upstream version to see if it's improved.
+
+PORTING
+
+detachtty is tested primarily on GNU/Linux boxes.  It should work on
+ - anything with a forkpty() call
+ - anything with an openpty() call that the code in forkpty.c will run on
+but you may need to tune things
+
+(1) Look at the Makefile.  Alter OS_CFLAGS, OS_LOADLIBES, OS_OBJECTS
+as necessary.
+
+(2) If that's insufficient (e.g. you need more header files), add the
+necessary stanzas to config.h and return to step 1
+
+(3) If that's still insufficent, do something else reasonably tasteful,
+or mail me describing what else you need
+
+(4) Send me your patch
+
+(NB: auto* is _not_ reasonably tasteful)
+
+
+
+dan@telent.net
