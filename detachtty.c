@@ -239,7 +239,7 @@ set_noecho(int fd)              /* turn off echo (for slave pty) */
     stermios.c_cc[VERASE2]=0177;
 #endif
     if (tcsetattr(fd, TCSANOW, &stermios) < 0)
-        bail("tcsetattr error");
+        bail("detach child","tcsetattr error");
 }
 
 void usage(char *name,char *offending_option) {

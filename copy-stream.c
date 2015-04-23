@@ -21,7 +21,7 @@ int copy_a_bit(int in_fd, int out_fd, int dribble_fd, char *message) {
 
 int output_buffer(int fd) {
     int bytes_written=0,bytes_to_write=bytes_in_buf;
-    if(fd<0) return;
+    if(fd<0) return 0;
     while(bytes_to_write>0) {
 	bytes_written=write(fd,buf,bytes_to_write);
 	if(bytes_written==-1) return -1;

@@ -177,7 +177,7 @@ void connect_ssh(char *host, char *path, char *cmd) {
     char buf[2];
 
   
-    if(pipe(&pipe_des)) bail("pipe");
+    if(pipe(pipe_des)) bail("attachtty","pipe");
     pid=fork();
     if(pid<0) {			/* error */
 	    bail("attachtty","Can't fork");
