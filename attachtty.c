@@ -29,7 +29,26 @@ void tears_in_the_rain(int signal) {
     time_to_die=signal;
 }
 
-main(int argc,char *argv[], char *envp[]) {
+struct termios saved_tty;
+
+int init_tty(void) {
+    struct termios tty;
+    int err = tcgetattr(0, &saved_tty);
+    if (err == 0)
+    {
+        tty = saved_tty;
+        tty.c_iflag &= ~(INLCR|ICRNL);
+        tty.c_lflag &= ~(ECHO|ICANON);
+        err = tcsetattr(0, TCSADRAIN, &tty);
+    }
+    return err;
+}
+
+int cleanup_tty(void) {
+    return tcsetattr(0, TCSADRAIN, &saved_tty);
+}
+
+int main(int argc,char *argv[], char *envp[]) {
     char *host=NULL;		/* "hostname" or "user@hostname" */
     char *path;			/* path to socket */
     char *p;
@@ -43,7 +62,7 @@ main(int argc,char *argv[], char *envp[]) {
     }
     p=strdup(argv[1]);
     log_fp=stderr;
-    if(path=strchr(p,':')) {
+    if((path=strchr(p,':')) != NULL) {
 	    host=p;
 	    *path='\0';
 	    path++;
@@ -70,6 +89,7 @@ main(int argc,char *argv[], char *envp[]) {
     sigaction(SIGCHLD,&act,0);
     sigaction(SIGQUIT,&act,0);
 
+    init_tty();
     if(host) {
 	    logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
 	    connect_ssh(host,path,cmd);
@@ -77,6 +97,8 @@ main(int argc,char *argv[], char *envp[]) {
 	    logprintf("attachtty","connecting directly to %s\n",path);
 	    connect_direct(path,cmd,timeout);
     }
+    cleanup_tty();
+    return 0;
 }
 
 /* copy between stdin,stdout and unix-domain socket */
@@ -193,7 +215,7 @@ void connect_ssh(char *host, char *path, char *cmd) {
 	    bail("attachtty", "exec failed");
     } else {			/* parent */
 	    logprintf("attachtty","Successfully started"); 
-	    while(! time_to_die) {
+            while(! time_to_die) {
 	      if(was_interrupted) {
 		      buf[0]='\003';
 		      write(pipe_des[1],buf,1);
