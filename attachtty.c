@@ -179,61 +179,13 @@ void connect_direct(char * path, char *cmd, int timeout) {
 
 
 
-/*
-  create pipe
-  fork,
-  in child, manipulate fd so pipe reader=0
-  in child, start ssh
-  install sigint handler
-  normal usage: copy stdin to pipe writer
-  if sigint received, send \003 to pipe 
-
-*/
-  
-/* we do character-at-a-time copying into ssh, because speed is not 
-   critical and I'm lazy */
-
 void connect_ssh(char *host, char *path, char *cmd) {
-    int pipe_des[2];
-    int pid;
-    char buf[2];
-
-  
-    if(pipe(pipe_des)) bail("attachtty","pipe");
-    pid=fork();
-    if(pid<0) {			/* error */
-	    bail("attachtty","Can't fork");
-    } else if(pid==0) {		/* child */
-	    setsid();
-	    close(0);
-	    dup2(pipe_des[0],0);
-      if (cmd) {
-        execlp("ssh", "ssh", host, "attachtty", path, cmd, NULL);
-      } else {
-        execlp("ssh", "ssh", host, "attachtty", path, NULL);
-      }
-	    bail("attachtty", "exec failed");
-    } else {			/* parent */
-	    logprintf("attachtty","Successfully started"); 
-            while(! time_to_die) {
-	      if(was_interrupted) {
-		      buf[0]='\003';
-		      write(pipe_des[1],buf,1);
-		      was_interrupted=0;
-	      }
-	      if(read(0,buf,1) == 0) {
-		      logprintf("attachtty","closed connection due to zero-length read");
-		      time_to_die=SIGTERM;
-	      }else 
-		      write(pipe_des[1],buf,1);
-	    }
-	    if(time_to_die==SIGCHLD) {
-	      logprintf("attachtty","ssh exited, so closed connection");
-	    } else {
-	      kill(pid,SIGTERM);	/* if it's still there, say goodbye */
-	    }
-	  /* don't worry about wait()ing for it, we're leaving anyway */
+    if (cmd) {
+        execlp("ssh", "ssh", host, "attachtty", path, cmd, (char *)NULL);
+    } else {
+        execlp("ssh", "ssh", host, "attachtty", path,  (char *)NULL);
     }
+    bail("attachtty", "exec ssh failed");
 }
 
 /* 

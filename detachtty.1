@@ -110,10 +110,11 @@ the form
 .IR username @ host : socket-path
 where 
 .IR username @ host 
-is passed to ssh.  No provision is made to accept password input,
-so ssh must be able to make a connection without needing it.  See 
-.BR ssh-agent (1).
-.P
+is passed to ssh. The latter form is an alias for 
+\fIssh\fR
+.IR username @ host
+\fIattachtty socket-path [command]\fR
+and lets ssh manage the authentication, i.e. whether to ask for a password or not.
 .TP
 .I command
 The command to run (which is searched for in the normal way) without
