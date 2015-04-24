@@ -37,7 +37,7 @@ int init_tty(void) {
     {
         tty = saved_tty;
         tty.c_iflag &= ~(INLCR|ICRNL);
-        tty.c_lflag &= ~(ECHO|ICANON);
+        tty.c_lflag &= ~(ECHO|ICANON|IEXTEN|IXON|ISIG);
         err = tcsetattr(0, TCSADRAIN, &tty);
     }
     return err;
