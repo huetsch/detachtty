@@ -1,5 +1,7 @@
+#include <errno.h>
+#include <time.h>
+
 #include "config.h"
-#include "time.h"
 
 extern FILE *log_fp;
 int copy_a_bit(int in_fd, int out_fd, int dribble_fd,char *message) ;
@@ -8,7 +10,6 @@ void connect_ssh(char *host, char *path, char *cmd) ;
 
 int init_tty(void);
 int cleanup_tty(void);
-void setup_ctrl_z_handler(void);
 
 #define UNIX_PATH_MAX 108
 
@@ -24,7 +25,7 @@ void setup_ctrl_z_handler(void);
 
 */
 
-int was_interrupted=0, time_to_die=0;
+volatile int was_interrupted=0, was_suspended=0, time_to_die=0;
 void tears_in_the_rain(int signal) {
     time_to_die=signal;
 }
@@ -32,22 +33,35 @@ void control_c_pressed(int signal) {
     was_interrupted=1;
 }
 void control_z_pressed(int signal) {
-    /* restore tty settings before suspending ourself */
-    cleanup_tty();
-    
-    raise(signal);
-
-    /* received SIGCONT: perform again initial setup */
-    setup_ctrl_z_handler();
-    init_tty();
+    was_suspended=1;
 }
 
-void setup_ctrl_z_handler(void)  {
+void init_ctrl_z_handler(void)  {
     struct  sigaction act;
     act.sa_handler=control_z_pressed;
     sigemptyset(&(act.sa_mask));
     act.sa_flags=SA_RESETHAND;
     sigaction(SIGTSTP,&act,0);
+}
+
+void cleanup_ctrl_z_handler(void)  {
+    struct sigaction act;
+    act.sa_handler=SIG_DFL;
+    sigemptyset(&(act.sa_mask));
+    act.sa_flags=SA_RESETHAND;
+    sigaction(SIGTSTP,&act,0);
+}
+
+void suspend_myself(void) {
+    /* restore tty and SIGTSTP settings before suspending myself */
+    cleanup_tty();
+    cleanup_ctrl_z_handler();
+    
+    kill(getpid(), SIGTSTP);
+
+    /* received SIGCONT: perform again initial setup */
+    init_ctrl_z_handler();
+    init_tty();
 }
 
    
@@ -120,8 +134,8 @@ int main(int argc,char *argv[], char *envp[]) {
     act.sa_flags=SA_RESETHAND;
     sigaction(SIGCHLD,&act,0);
     sigaction(SIGQUIT,&act,0);
-    /* catch SIGSTOP and cleanup tty */
-    setup_ctrl_z_handler();
+    /* catch SIGSTOP and cleanup tty before suspending */
+    init_ctrl_z_handler();
 
     if (host) {
         logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
@@ -141,7 +155,7 @@ int main(int argc,char *argv[], char *envp[]) {
 /* copy between stdin,stdout and unix-domain socket */
 
 void connect_direct(char * path, char *cmd, int timeout) {
-    int sock=-1;
+    int err=0, sock=-1;
     struct pollfd ufds[3];
     struct sockaddr_un s_a;
 
@@ -158,25 +172,36 @@ void connect_direct(char * path, char *cmd, int timeout) {
     if (cmd) {
         int time_start = time(NULL);
         int time_end = time_start + timeout;
+        int msec_left;
         ufds[0].fd=sock; ufds[0].events=POLLIN | POLLOUT;
 
         while(! time_to_die) {
-            if(was_interrupted) {
-                write(sock,"\003",1);
+            if (was_interrupted) {
                 was_interrupted=0;
+                write(sock,"\003",1);
             }
-            int msec_left = (time_end - time(NULL)) * 1000;  
-            if (poll(ufds, 1 , msec_left) == -1) continue;
-            if(ufds[0].revents & POLLIN) 
+	    if (was_suspended) {
+                was_suspended=0;
+	        suspend_myself();
+	    }
+            msec_left = (time_end - time(NULL)) * 1000;  
+            if (poll(ufds, 1, msec_left) == -1) {
+	       if (errno == EINTR)
+		   continue;
+	       else
+		   bail("attachtty", "poll");
+	    }
+	        
+            if (ufds[0].revents & POLLIN) 
                 copy_a_bit(sock,1,-1,"copying from socket");
 	
-            if(cmd && (ufds[0].revents & POLLOUT)) {
+            if (cmd && (ufds[0].revents & POLLOUT)) {
                 int len = strlen(cmd);
-                int written = write(sock,cmd,strlen(cmd));
+                int written = write(sock,cmd,len);
                 if (written == len) {
                     ufds[0].events = POLLIN; /* no longer need to output */
                     cmd = NULL;
-                    write(sock,"\012",1);
+                    write(sock,"\r",1);
                 } else 
                     cmd += written;
             }
@@ -193,10 +218,20 @@ void connect_direct(char * path, char *cmd, int timeout) {
                 write(sock,"\003",1);
                 was_interrupted=0;
             }
+	    if (was_suspended) {
+                was_suspended=0;
+	        suspend_myself();
+	    }
             ufds[0].fd=sock; ufds[0].events=POLLIN;
             ufds[1].fd=0; ufds[1].events=POLLIN|POLLHUP;
-            if (poll(ufds,2 ,-1) == -1) continue;
-            if(ufds[0].revents & POLLIN) 
+            if (poll(ufds, 2, -1) == -1) {
+	       if (errno == EINTR)
+		   continue;
+	       else
+		   bail("attachtty", "poll");
+	    }
+	   
+	    if (ufds[0].revents & POLLIN) 
                 copy_a_bit(sock,1,-1,"copying from socket");
     
             if(ufds[1].revents & POLLIN) {	
