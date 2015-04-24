@@ -88,20 +88,18 @@ int main(int argc,char *argv[], char *envp[]) {
     sigaction(SIGCHLD,&act,0);
     sigaction(SIGQUIT,&act,0);
 
-    init_tty();
-    
     if (host) {
         logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
         connect_ssh(host,path,cmd);
     } else {
         logprintf("attachtty","connecting directly to %s\n",path);
+        init_tty();
         connect_direct(path,cmd,timeout);
+        cleanup_tty();
     }
     if (time_to_die != 0) {
         logprintf("attachtty","got signal %d, closing down\n",time_to_die);
     }
-
-    cleanup_tty();
     return 0;
 }
 
@@ -184,10 +182,15 @@ void connect_direct(char * path, char *cmd, int timeout) {
 
 
 void connect_ssh(char *host, char *path, char *cmd) {
+    /* 
+     * ssh option -t forces tty allocation on remote side.
+     * Needed to properly setup local and remote tty,
+     * including -icanon -iecho flags and forwarding of CTRL+C
+     */
     if (cmd) {
-        execlp("ssh", "ssh", host, "attachtty", path, cmd, (char *)NULL);
+        execlp("ssh", "ssh", "-t", host, "attachtty", path, cmd, (char *)NULL);
     } else {
-        execlp("ssh", "ssh", host, "attachtty", path,  (char *)NULL);
+        execlp("ssh", "ssh", "-t", host, "attachtty", path,  (char *)NULL);
     }
     bail("attachtty", "exec ssh failed");
 }
