@@ -25,7 +25,6 @@ void control_c_pressed(int signal) {
     was_interrupted=1;
 }
 void tears_in_the_rain(int signal) {
-    fprintf(log_fp, "Got signal %d, closing down\n", signal);
     time_to_die=signal;
 }
 
@@ -90,13 +89,18 @@ int main(int argc,char *argv[], char *envp[]) {
     sigaction(SIGQUIT,&act,0);
 
     init_tty();
-    if(host) {
-	    logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
-	    connect_ssh(host,path,cmd);
+    
+    if (host) {
+        logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
+        connect_ssh(host,path,cmd);
     } else {
-	    logprintf("attachtty","connecting directly to %s\n",path);
-	    connect_direct(path,cmd,timeout);
+        logprintf("attachtty","connecting directly to %s\n",path);
+        connect_direct(path,cmd,timeout);
     }
+    if (time_to_die != 0) {
+        logprintf("attachtty","got signal %d, closing down\n",time_to_die);
+    }
+
     cleanup_tty();
     return 0;
 }
