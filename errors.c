@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <time.h>
 #include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 FILE *log_fp=NULL;
 
@@ -19,12 +21,11 @@ int logprintf(char *progname, char *msg,...) {
 }
 
 void bail(char *progname,char *msg,...) {
-    int n;
     va_list ap;
     int e=errno;
     va_start(ap, msg);
     fprintf(log_fp,";;; %s: %ld: FATAL ",progname,time(0));
-    n=vfprintf(log_fp,msg,ap);
+    vfprintf(log_fp,msg,ap);
     va_end(ap);
     if(e>0) 
 	fprintf(log_fp," (%s)\n",strerror(e));

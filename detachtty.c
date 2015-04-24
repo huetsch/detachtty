@@ -70,13 +70,17 @@ void open_files(int signal) {
 
 #define CLIENT_CONNECTED (sock>=0)
 
-main(int argc,char *argv[], char *envp[]) {
-    int pty_master,pty_slave;
+int main(int argc,char *argv[], char *envp[]) {
+    int pty_master;
     char pty_name[]="/dev/pts/wherever/something"; /* XXX */
     int master_socket=-1,sock=-1,next_arg;
     struct pollfd ufds[3];
     struct sockaddr_un s_a,their_addr;
+#ifdef __linux__
+    socklen_t spare_integer=1;
+#else
     int spare_integer=1;
+#endif
     mode_t old_umask;
 
     struct termios my_termios;
@@ -216,6 +220,7 @@ main(int argc,char *argv[], char *envp[]) {
             }
         }
     }
+    return 0;
 }
 
 /* borrowed from APUE example code found at

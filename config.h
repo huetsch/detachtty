@@ -29,4 +29,5 @@
 #endif
 
 int output_buffer(int fd);
+int logprintf(char *progname, char *msg,...);
 void bail(char *progname,char *msg,...);
