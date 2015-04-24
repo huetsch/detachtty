@@ -5,8 +5,8 @@
 
 extern FILE *log_fp;
 int copy_a_bit(int in_fd, int out_fd, int dribble_fd,char *message) ;
-void connect_direct(char * path, char *cmd, int timeout) ;
-void connect_ssh(char *host, char *path, char *cmd) ;
+void connect_direct(char * path, char *text, int timeout) ;
+void connect_ssh(char *host, char *path, char *text, char *timeout) ;
 
 int init_tty(void);
 int cleanup_tty(void);
@@ -98,13 +98,18 @@ int main(int argc,char *argv[], char *envp[]) {
     char *host=NULL;		/* "hostname" or "user@hostname" */
     char *path;			/* path to socket */
     char *p;
-    char *cmd=NULL;
+    char *text=NULL;
+    char *timeout_str=NULL;
     int timeout = 1;
     struct  sigaction  act;
   
-    if(argc<2 || argc>4) {
-	    fprintf(stderr, "%s: unrecognized arguments\nusage: %s /path/to/socket [cmd] [timeout]\n       %s remote_user@remote_host:/path/to/socket [cmd]\n", argv[0],  argv[0], argv[0]);
-	    exit(1);
+    if (argc<2 || argc>4) {
+        fprintf(stderr,
+		"%s: unrecognized arguments\n"
+		"usage: %s /path/to/socket [text] [timeout]\n"
+		"       %s remote_user@remote_host:/path/to/socket [text] [timeout]\n",
+		argv[0],  argv[0], argv[0]);
+        exit(1);
     }
     p=strdup(argv[1]);
     log_fp=stderr;
@@ -116,9 +121,10 @@ int main(int argc,char *argv[], char *envp[]) {
 	    path=p;
     }
     if (argc >= 3)
-        cmd = argv[2];
+        text = argv[2];
     if (argc == 4) {
-        int read_timeout = atoi(argv[3]);
+        timeout_str = argv[3];
+        int read_timeout = atoi(timeout_str);
         if (read_timeout > 0)
             timeout = read_timeout;
     }
@@ -139,11 +145,11 @@ int main(int argc,char *argv[], char *envp[]) {
 
     if (host) {
         logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
-        connect_ssh(host,path,cmd);
+        connect_ssh(host,path,text,timeout_str);
     } else {
         logprintf("attachtty","connecting directly to %s\n",path);
         init_tty();
-        connect_direct(path,cmd,timeout);
+        connect_direct(path,text,timeout);
         cleanup_tty();
     }
     if (time_to_die != 0) {
@@ -154,8 +160,8 @@ int main(int argc,char *argv[], char *envp[]) {
 
 /* copy between stdin,stdout and unix-domain socket */
 
-void connect_direct(char * path, char *cmd, int timeout) {
-    int err=0, sock=-1;
+void connect_direct(char * path, char *text, int timeout) {
+    int sock=-1;
     struct pollfd ufds[3];
     struct sockaddr_un s_a;
 
@@ -169,7 +175,7 @@ void connect_direct(char * path, char *cmd, int timeout) {
     if(connect(sock,(const struct sockaddr *) &s_a,sizeof s_a)!=0) 
 	    bail("attachtty","connect");
   
-    if (cmd) {
+    if (text) {
         int time_start = time(NULL);
         int time_end = time_start + timeout;
         int msec_left;
@@ -195,15 +201,15 @@ void connect_direct(char * path, char *cmd, int timeout) {
             if (ufds[0].revents & POLLIN) 
                 copy_a_bit(sock,1,-1,"copying from socket");
 	
-            if (cmd && (ufds[0].revents & POLLOUT)) {
-                int len = strlen(cmd);
-                int written = write(sock,cmd,len);
+            if (text && (ufds[0].revents & POLLOUT)) {
+                int len = strlen(text);
+                int written = write(sock,text,len);
                 if (written == len) {
                     ufds[0].events = POLLIN; /* no longer need to output */
-                    cmd = NULL;
+                    text = NULL;
                     write(sock,"\r",1);
                 } else 
-                    cmd += written;
+                    text += written;
             }
 
             if (time(NULL) >= time_end) {
@@ -251,17 +257,13 @@ void connect_direct(char * path, char *cmd, int timeout) {
 
 
 
-void connect_ssh(char *host, char *path, char *cmd) {
+void connect_ssh(char *host, char *path, char *text, char *timeout_str) {
     /* 
      * ssh option -t forces tty allocation on remote side.
      * Needed to properly setup local and remote tty,
      * including -icanon -iecho flags and forwarding of CTRL+C
      */
-    if (cmd) {
-        execlp("ssh", "ssh", "-t", host, "attachtty", path, cmd, (char *)NULL);
-    } else {
-        execlp("ssh", "ssh", "-t", host, "attachtty", path,  (char *)NULL);
-    }
+    execlp("ssh", "ssh", "-t", host, "attachtty", path, text, timeout_str, (char *)NULL);
     bail("attachtty", "exec ssh failed");
 }
 
