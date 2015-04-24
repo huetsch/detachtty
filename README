@@ -52,14 +52,19 @@ across the network.  This requires
 - that you also have attachtty installed on the machine that you are
   running detachtty on, and that it's somewhere on the path
 
-- that you have ssh set up not to need to ask for a password (e.g
-  using ssh-agent)
-
 It's often nice to be able to interrupt a process, especially when
 it's stuck in some kind of loop.  attachtty catches SIGINT and sends
 the character \003 into the pty master, which causes the controlled
 process to get a SIGINT of its own.  This works at least for using
 with ILISP and CMUCL.
+
+To terminate attachtty, sending it SIGQUIT (usually from the
+keyboard with CONTROL+\): it will detach from the unix-domain socket,
+leaving the server process running. Sometimes you need to press it twice.
+
+You can also suspend and resume attachtty as a regular Unix process
+(usually from the keyboard with CONTROL+Z). The server process
+will keep running while attachtty is suspended.
 
 * Using it - an example
 
