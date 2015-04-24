@@ -6,6 +6,10 @@ int copy_a_bit(int in_fd, int out_fd, int dribble_fd,char *message) ;
 void connect_direct(char * path, char *cmd, int timeout) ;
 void connect_ssh(char *host, char *path, char *cmd) ;
 
+int init_tty(void);
+int cleanup_tty(void);
+void setup_ctrl_z_handler(void);
+
 #define UNIX_PATH_MAX 108
 
 /*
@@ -21,14 +25,41 @@ void connect_ssh(char *host, char *path, char *cmd) ;
 */
 
 int was_interrupted=0, time_to_die=0;
-void control_c_pressed(int signal) {
-    was_interrupted=1;
-}
 void tears_in_the_rain(int signal) {
     time_to_die=signal;
 }
+void control_c_pressed(int signal) {
+    was_interrupted=1;
+}
+void control_z_pressed(int signal) {
+    /* restore tty settings before suspending ourself */
+    cleanup_tty();
+    
+    raise(signal);
+
+    /* received SIGCONT: perform again initial setup */
+    setup_ctrl_z_handler();
+    init_tty();
+}
+
+void setup_ctrl_z_handler(void)  {
+    struct  sigaction act;
+    act.sa_handler=control_z_pressed;
+    sigemptyset(&(act.sa_mask));
+    act.sa_flags=SA_RESETHAND;
+    sigaction(SIGTSTP,&act,0);
+}
+
+   
 
 struct termios saved_tty;
+
+#ifndef _POSIX_VDISABLE
+# define _POSIX_VDISABLE 0
+#endif
+#ifndef ONOCR
+# define ONOCR 0
+#endif
 
 int init_tty(void) {
     struct termios tty;
@@ -36,8 +67,10 @@ int init_tty(void) {
     if (err == 0)
     {
         tty = saved_tty;
-        tty.c_iflag &= ~(INLCR|ICRNL);
-        tty.c_lflag &= ~(ECHO|ICANON|IEXTEN|IXON|ISIG);
+        tty.c_iflag &= ~(INLCR|ICRNL|IGNCR|IXON|IXOFF);
+        tty.c_oflag &= ~(ONLCR|OCRNL|ONOCR|ONLRET);
+        tty.c_lflag &= ~(ECHO|ICANON|IEXTEN);
+        tty.c_cc[VSTART] = tty.c_cc[VSTOP] = _POSIX_VDISABLE;
         err = tcsetattr(0, TCSADRAIN, &tty);
     }
     return err;
@@ -81,12 +114,14 @@ int main(int argc,char *argv[], char *envp[]) {
     sigemptyset(&(act.sa_mask));
     act.sa_flags=0;
     sigaction(SIGINT,&act,0);
-    /* catch SIGCHLD and exit */
+    /* catch SIGCHLD or SIGQUIT and exit */
     act.sa_handler=tears_in_the_rain;
     sigemptyset(&(act.sa_mask));
     act.sa_flags=SA_RESETHAND;
     sigaction(SIGCHLD,&act,0);
     sigaction(SIGQUIT,&act,0);
+    /* catch SIGSTOP and cleanup tty */
+    setup_ctrl_z_handler();
 
     if (host) {
         logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
