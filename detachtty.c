@@ -54,7 +54,7 @@ void open_files(int signal) {
         if(log_fp==NULL) perror("fopen");
         setvbuf(log_fp,NULL,_IONBF,0); /* don't buffer */
         if(signal>0) 
-            logprintf(MY_NAME,"Got signal %d, reopened log file\n",signal);
+            logprintf(MY_NAME,"Got signal %d, reopened log file",signal);
     } else {
         log_fp=stderr;
     }
@@ -132,7 +132,7 @@ int main(int argc,char *argv[], char *envp[]) {
 
     spare_integer=1;
     if(bind(master_socket,(const struct sockaddr *) &s_a,sizeof s_a)!=0) {
-        logprintf(MY_NAME,"Is \"%s\" a dead socket from a previous run?\n",socket_path);
+        logprintf(MY_NAME,"Is \"%s\" a dead socket from a previous run?",socket_path);
         bail(MY_NAME,"bind");
     }
     if(listen(master_socket,1)!=0) bail(MY_NAME,"listen");
@@ -178,13 +178,13 @@ int main(int argc,char *argv[], char *envp[]) {
         act.sa_flags=0;
         sigaction(SIGHUP,&act,0);
 
-        logprintf(MY_NAME,"Successfully started\n"); 
+        logprintf(MY_NAME,"Successfully started"); 
         while(1) {
             ufds[0].fd=pty_master; ufds[0].events=POLLIN|POLLHUP;
             ufds[1].fd=master_socket; ufds[1].events=POLLIN;
             ufds[2].fd=sock; ufds[2].events=POLLIN|POLLHUP;
             if(poll(ufds,CLIENT_CONNECTED ? 3 : 2 ,-1) == -1) {
-                logprintf(MY_NAME, "poll returned -1\n");
+                logprintf(MY_NAME, "poll returned -1");
                 continue;
             }
             if(ufds[0].revents & POLLIN) 
@@ -197,7 +197,7 @@ int main(int argc,char *argv[], char *envp[]) {
                                 &spare_integer);
                 if (new_sock >= 0)
                 {
-                    logprintf(MY_NAME,"accepted connection");
+                    logprintf(MY_NAME,"accepted connection%s", (CLIENT_CONNECTED ? " (and closing previous one)" : ""));
                     if (CLIENT_CONNECTED)
                         close(sock);
                     sock = new_sock;
@@ -212,7 +212,7 @@ int main(int argc,char *argv[], char *envp[]) {
                 }
             }
             if(ufds[0].revents & POLLHUP) {
-                logprintf(MY_NAME,"Child terminated, exiting\n");
+                logprintf(MY_NAME,"Child terminated, exiting");
                 if(sock>=0) { close(sock); sock=-1; }
                 tidy_up_nicely(0);
             }
@@ -256,7 +256,10 @@ void usage(char *name,char *offending_option) {
     else
         fprintf(stderr,"%s: unrecognized arguments\n",
                 name);
-    fprintf(stderr,"usage: \n %s [--no-detach] [--dribble-file name] [--log-file name] \\\n   [--pid-file name] socket-path /path/to/command [arg] [arg] [arg] ...\n", name);
+    fprintf(stderr,"usage:\n"
+            " %s [--no-detach] [--dribble-file name] [--log-file name] \\\n"
+            "   [--pid-file name] socket-path /path/to/command [arg] [arg] [arg] ...\n",
+            name);
 }
 
 /* 

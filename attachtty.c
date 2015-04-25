@@ -113,6 +113,10 @@ int init_tty(void) {
     {
         tty = saved_tty;
         tty.c_iflag &= ~(INLCR|ICRNL|IGNCR|IXON|IXOFF);
+        tty.c_oflag &= ~(OCRNL|ONOCR|ONLRET);
+#ifdef ONLCR
+        tty.c_oflag |= ONLCR; /* avoid staircase effect */
+#endif
         tty.c_oflag &= ~(ONLCR|OCRNL|ONOCR|ONLRET);
         tty.c_lflag &= ~(ECHO|ICANON|IEXTEN);
         tty.c_cc[VSTART] = tty.c_cc[VSTOP] = _POSIX_VDISABLE;
@@ -162,16 +166,16 @@ int main(int argc,char *argv[], char *envp[]) {
     init_signal_handlers();
 
     if (host) {
-        logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
+        logprintf("attachtty","connecting through ssh to %s on %s",path,host);
         connect_ssh(host,path,text,timeout_str);
     } else {
-        logprintf("attachtty","connecting directly to %s\n",path);
+        logprintf("attachtty","connecting directly to %s",path);
         init_tty();
         connect_direct(path,text,timeout);
         cleanup_tty();
     }
     if (time_to_die != 0) {
-        logprintf("attachtty","got signal %d, closing down\n",time_to_die);
+        logprintf("attachtty","got signal %d, closing down",time_to_die);
     }
     return 0;
 }
