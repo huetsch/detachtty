@@ -4,12 +4,13 @@
 #include "config.h"
 
 extern FILE *log_fp;
-int copy_a_bit(int in_fd, int out_fd, int dribble_fd,char *message) ;
 void connect_direct(char * path, char *text, int timeout) ;
 void connect_ssh(char *host, char *path, char *text, char *timeout) ;
 
 int init_tty(void);
 int cleanup_tty(void);
+void init_signal_handlers(void);
+void cleanup_signal_handler(int signal);
 
 #define UNIX_PATH_MAX 108
 
@@ -28,6 +29,7 @@ int cleanup_tty(void);
 volatile int was_interrupted=0, was_suspended=0, time_to_die=0;
 void tears_in_the_rain(int signal) {
     time_to_die=signal;
+    cleanup_signal_handler(signal);
 }
 void control_c_pressed(int signal) {
     was_interrupted=1;
@@ -37,19 +39,15 @@ void control_z_pressed(int signal) {
 }
 
 void init_ctrl_z_handler(void)  {
-    struct  sigaction act;
-    act.sa_handler=control_z_pressed;
+    struct sigaction act;
+    act.sa_handler = control_z_pressed;
     sigemptyset(&(act.sa_mask));
-    act.sa_flags=SA_RESETHAND;
+    act.sa_flags = SA_RESETHAND;
     sigaction(SIGTSTP,&act,0);
 }
 
-void cleanup_ctrl_z_handler(void)  {
-    struct sigaction act;
-    act.sa_handler=SIG_DFL;
-    sigemptyset(&(act.sa_mask));
-    act.sa_flags=SA_RESETHAND;
-    sigaction(SIGTSTP,&act,0);
+void cleanup_ctrl_z_handler(void) {
+    cleanup_signal_handler(SIGTSTP);
 }
 
 void suspend_myself(void) {
@@ -63,6 +61,39 @@ void suspend_myself(void) {
     init_ctrl_z_handler();
     init_tty();
 }
+
+
+void init_signal_handlers(void) {
+    struct sigaction act;
+    int i, fatal_sig[] = { SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE, SIGSEGV, SIGPIPE, SIGTERM, SIGSTKFLT, SIGCHLD, SIGXCPU, SIGXFSZ, };
+    
+    /* catch SIGINT and send character \003 over the link */
+    act.sa_handler=control_c_pressed;
+    sigemptyset(&(act.sa_mask));
+    act.sa_flags=0;
+    sigaction(SIGINT,&act,0);
+
+    /* catch SIGSTOP and cleanup tty before suspending */
+    init_ctrl_z_handler();
+
+    /* catch SIGCHLD, SIGQUIT, SIGTERM, SIGILL, SIGFPE... and exit */
+    act.sa_handler = tears_in_the_rain;
+    sigemptyset(&(act.sa_mask));
+    act.sa_flags=SA_RESETHAND;
+    for (i = 0; i < sizeof(fatal_sig)/sizeof(fatal_sig[0]); i++) {
+        sigaction(fatal_sig[i],&act,0);
+    }
+}
+
+void cleanup_signal_handler(int sig) {
+    struct sigaction act;
+    act.sa_handler=SIG_DFL;
+    sigemptyset(&(act.sa_mask));
+    act.sa_flags=0;
+    sigaction(sig,&act,0);
+}
+
+
 
    
 
@@ -101,7 +132,6 @@ int main(int argc,char *argv[], char *envp[]) {
     char *text=NULL;
     char *timeout_str=NULL;
     int timeout = 1;
-    struct  sigaction  act;
   
     if (argc<2 || argc>4) {
         fprintf(stderr,
@@ -129,19 +159,7 @@ int main(int argc,char *argv[], char *envp[]) {
             timeout = read_timeout;
     }
 
-    /* catch SIGINT and send character \003 over the link */
-    act.sa_handler=control_c_pressed;
-    sigemptyset(&(act.sa_mask));
-    act.sa_flags=0;
-    sigaction(SIGINT,&act,0);
-    /* catch SIGCHLD or SIGQUIT and exit */
-    act.sa_handler=tears_in_the_rain;
-    sigemptyset(&(act.sa_mask));
-    act.sa_flags=SA_RESETHAND;
-    sigaction(SIGCHLD,&act,0);
-    sigaction(SIGQUIT,&act,0);
-    /* catch SIGSTOP and cleanup tty before suspending */
-    init_ctrl_z_handler();
+    init_signal_handlers();
 
     if (host) {
         logprintf("attachtty","connecting through ssh to %s on %s\n",path,host);
@@ -198,8 +216,10 @@ void connect_direct(char * path, char *text, int timeout) {
 		   bail("attachtty", "poll");
 	    }
 	        
-            if (ufds[0].revents & POLLIN) 
-                copy_a_bit(sock,1,-1,"copying from socket");
+            if (ufds[0].revents & POLLIN) {
+                if (copy_a_bit_with_log(sock,1,-1,"attachtty","copying from socket") == 0)
+                    break;
+            }
 	
             if (text && (ufds[0].revents & POLLOUT)) {
                 int len = strlen(text);
@@ -220,7 +240,7 @@ void connect_direct(char * path, char *text, int timeout) {
         }
     } else {
         while(! time_to_die) {
-            if(was_interrupted) {
+            if (was_interrupted) {
                 write(sock,"\003",1);
                 was_interrupted=0;
             }
@@ -237,19 +257,17 @@ void connect_direct(char * path, char *text, int timeout) {
 		   bail("attachtty", "poll");
 	    }
 	   
-	    if (ufds[0].revents & POLLIN) 
-                copy_a_bit(sock,1,-1,"copying from socket");
-    
-            if(ufds[1].revents & POLLIN) {	
-                int n=copy_a_bit(0,sock,-1,"copying to socket");
-                if(n==0) {
-                    logprintf("attachtty","closed connection due to zero-length read");
-                    close(sock); sock=-1;
-                }
+	    if (ufds[0].revents & POLLIN) {
+                if (copy_a_bit_with_log(sock,1,-1,"attachtty","copying from socket") == 0)
+                    break;
             }
-            if(ufds[1].revents & POLLHUP) {
+            if (ufds[1].revents & POLLIN) {	
+                if (copy_a_bit_with_log(0,sock,-1,"attachtty","copying to socket") == 0)
+                    break;
+            }
+            if (ufds[1].revents & POLLHUP) {
                 logprintf("attachtty","closed connection due to hangup");
-                exit(0);
+                break;
             }
         }
     }

@@ -19,6 +19,14 @@ int copy_a_bit(int in_fd, int out_fd, int dribble_fd, char *message) {
     return bytes_in_buf;
 }
 
+
+int copy_a_bit_with_log(int in_fd, int out_fd, int dribble_fd, char * program, char *message) {
+    int n=copy_a_bit(in_fd, out_fd, dribble_fd, message);
+    if (n==0)
+        logprintf(program, "%s %s" "closed connection due to zero-length read while", message);
+    return n;
+}
+
 int output_buffer(int fd) {
     int bytes_written=0,bytes_to_write=bytes_in_buf;
     if(fd<0) return 0;

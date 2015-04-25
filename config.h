@@ -28,6 +28,8 @@
 #include "forkpty.h"
 #endif
 
+int copy_a_bit(int in_fd, int out_fd, int dribble_fd, char *message);
+int copy_a_bit_with_log(int in_fd, int out_fd, int dribble_fd, char * program, char *message);
 int output_buffer(int fd);
 int logprintf(char *progname, char *msg,...);
 void bail(char *progname,char *msg,...);

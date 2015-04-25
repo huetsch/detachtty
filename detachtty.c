@@ -21,8 +21,6 @@
 */
 
 static void set_noecho(int fd);
-int copy_a_bit(int in_fd, int out_fd, int dribble_fd,char *message) ;
-int logprintf(char *progname, char *msg,...) ;
 void usage(char *name,char *offending_option);
 /*
   1) fork and open pty pairs.  start child process on the slave end
@@ -193,24 +191,29 @@ int main(int argc,char *argv[], char *envp[]) {
                 copy_a_bit(pty_master,sock,dribble_fd,"copying from pty");
       
             if(ufds[1].revents & POLLIN) {
+                int new_sock = -1;
                 spare_integer=sizeof their_addr;
-                sock=accept(master_socket,(struct sockaddr *) &their_addr,
-                            &spare_integer);
-                logprintf(MY_NAME,"accepted connection");
-                /* give them a copy of anything we read recently */
-                output_buffer(sock);
-                continue;
+                new_sock=accept(master_socket,(struct sockaddr *) &their_addr,
+                                &spare_integer);
+                if (new_sock >= 0)
+                {
+                    logprintf(MY_NAME,"accepted connection");
+                    if (CLIENT_CONNECTED)
+                        close(sock);
+                    sock = new_sock;
+                    /* give them a copy of anything we read recently */
+                    output_buffer(sock);
+                    continue;
+                }
             }
             if(CLIENT_CONNECTED && (ufds[2].revents & POLLIN)) {	
-                int n=copy_a_bit(sock,pty_master,dribble_fd,"copying to pty");
-                if(n==0) {
-                    logprintf(MY_NAME,"closed connection due to zero-length read");
-                    if(sock>-1) { close(sock); sock=-1; }
+                if (copy_a_bit_with_log(sock,pty_master,dribble_fd,MY_NAME,"copying to pty") == 0) {
+                    if(sock>=0) { close(sock); sock=-1; }
                 }
             }
             if(ufds[0].revents & POLLHUP) {
                 logprintf(MY_NAME,"Child terminated, exiting\n");
-                if(sock>-1) { close(sock); sock=-1; }
+                if(sock>=0) { close(sock); sock=-1; }
                 tidy_up_nicely(0);
             }
             if(CLIENT_CONNECTED && (ufds[2].revents & POLLHUP)) {
