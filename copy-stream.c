@@ -1,39 +1,191 @@
+#include <sys/types.h>
+#include <sys/socket.h>
+
 #include "config.h"
 
-static char buf[4097];
-static int bytes_in_buf=0;
+#if defined(SCM_RIGHTS) && defined(CMSG_FIRSTHDR) && defined(CMSG_LEN) && defined(CMSG_DATA) && defined(CMSG_NXTHDR)
+# define DETACHTTY_SENDFD_RECVFD
+#else
+# warn compiling without SENDFD/RECVD support
+#endif
 
-int copy_a_bit(int in_fd, int out_fd, int dribble_fd, char *message) {
+
+enum { len_of_buf = 4096 };
+static int bytes_in_buf = 0;
+static char buf[len_of_buf + 1];
+
+#ifdef DETACHTTY_SENDFD_RECVFD
+int send_bytes_and_fd(int out_fd, const char * bytes, int bytes_to_write, int send_fd)
+{
+    char control[sizeof(struct cmsghdr)+sizeof(int)];
+    struct msghdr  msg;
+    struct cmsghdr *cmsg;
+    struct iovec   iov;
+
+    if (send_fd < 0)
+        return -1;
+
+    /* Response data */
+    iov.iov_base = (char *)bytes;
+    iov.iov_len  = bytes_to_write;
+
+    /* compose the message */
+    memset(&msg, 0, sizeof(msg));
+    memset(control, 0, sizeof(control));
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof(control);
+
+    /* attach open in_fd */
+    cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    *(int *)CMSG_DATA(cmsg) = send_fd;
+
+    msg.msg_controllen = cmsg->cmsg_len;
+
+    return sendmsg(out_fd, &msg, 0);
+}
+
+int recv_bytes_and_fd(int in_fd, char * bytes, int bytes_to_read, int * recv_fd) {
+    char control[sizeof(struct cmsghdr)+sizeof(int)+100];
+    struct msghdr  msg;
+    struct cmsghdr *cmsg;
+    struct iovec   iov;
+
+    if (recv_fd == NULL)
+        return -1;
+
+    memset(&msg, 0, sizeof(msg));
+    memset(control, 0, sizeof(control));
+    iov.iov_base   = bytes;
+    iov.iov_len    = bytes_to_read;
+    msg.msg_iov    = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof(control);
+
+    bytes_to_read = recvmsg(in_fd, &msg, 0);
+    if (bytes_to_read < 0)
+        return bytes_to_read;
+
+    /* Loop over all control messages */
+    cmsg = CMSG_FIRSTHDR(&msg);
+    while (cmsg != NULL) {
+      if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type  == SCM_RIGHTS) {
+          * recv_fd = *(int *) CMSG_DATA(cmsg);
+          break;
+      }
+      cmsg = CMSG_NXTHDR(&msg, cmsg);
+    }
+    return bytes_to_read < iov.iov_len ? bytes_to_read : iov.iov_len;
+}
+#endif /* DETACHTTY_SENDFD_RECVFD */
+
+
+int full_write_bytes_and_sendfd(int out_fd, const char * bytes, int bytes_to_write, int send_fd) {
+    int bytes_written = 0, bytes_written_total = 0;
+    if (out_fd < 0 || bytes_to_write <= 0)
+        return 0;
+
+#ifdef DETACHTTY_SENDFD_RECVFD
+    if (send_fd >= 0 && send_bytes_and_fd(out_fd, bytes, 1, send_fd) >= 0) {
+        bytes++;
+        bytes_written_total++;
+        bytes_to_write--;
+    }
+#endif
+
+    while (bytes_to_write > 0) {
+	bytes_written = write(out_fd, bytes, bytes_to_write);
+	if (bytes_written < 0)
+            return bytes_written;
+	bytes_to_write -= bytes_written;
+        bytes += bytes_written;
+        bytes_written_total += bytes_written;
+    }
+    return bytes_written_total;
+}
+
+int output_buffer(int out_fd) {
+    return full_write_bytes_and_sendfd(out_fd, buf, bytes_in_buf, -1);
+}
+
+int output_buffer_sendfd(int out_fd, int send_fd) {
+    return full_write_bytes_and_sendfd(out_fd, buf, bytes_in_buf, send_fd);
+}
+
+
+
+
+
+int input_buffer_recvfd(int in_fd, int dribble_fd, int * recv_fd) {
+    int bytes_read = 0;
+#ifdef DETACHTTY_SENDFD_RECVFD
+    if (recv_fd != NULL)
+        bytes_read = recv_bytes_and_fd(in_fd, buf, len_of_buf, recv_fd);
+    else
+#endif
+        bytes_read = read(in_fd, buf, len_of_buf);
+
+    if (bytes_read > 0) {
+        /*
+          overwrite global variable bytes_in_buf only if we received something:
+          we preserve last read buffer for whoever will attach next
+        */
+        bytes_in_buf = bytes_read;
+        output_buffer(dribble_fd);
+    }
+    return bytes_read;
+}
+
+int input_buffer(int in_fd, int dribble_fd) {
+  return input_buffer_recvfd(in_fd, dribble_fd, NULL);
+}
+
+
+
+
+int copy_a_bit_sendfd_recvfd(int in_fd, int out_fd, int dribble_fd,
+                             int send_fd, int * recv_fd, char *message)
+{
     /* copy whatever's available (max 4k) from in_fd to out_fd (and
        dribble_fd if !=-1)
        Return number of bytes copied. Bail if error happens.  
        Note: not re-entrant */
   
-    bytes_in_buf=read(in_fd,buf,4096);
-    if(!bytes_in_buf) return 0;
-    output_buffer(dribble_fd);
-    if(output_buffer(out_fd)==-1) {
+    if (input_buffer_recvfd(in_fd, dribble_fd, recv_fd) <= 0)
+       return 0;
+    if (output_buffer_sendfd(out_fd, send_fd) < 0) {
 	perror(message);
 	exit(1);
     }
     return bytes_in_buf;
 }
 
-
-int copy_a_bit_with_log(int in_fd, int out_fd, int dribble_fd, char * program, char *message) {
-    int n=copy_a_bit(in_fd, out_fd, dribble_fd, message);
+int copy_a_bit_sendfd_recvfd_with_log(int in_fd, int out_fd, int dribble_fd,
+                                      int send_fd, int * recv_fd, char * program, char *message)
+{
+    int n = copy_a_bit_sendfd_recvfd(in_fd, out_fd, dribble_fd, send_fd, recv_fd, message);
     if (n==0)
         logprintf(program, "%s %s", "closed connection due to zero-length read while", message);
     return n;
 }
 
-int output_buffer(int fd) {
-    int bytes_written=0,bytes_to_write=bytes_in_buf;
-    if(fd<0) return 0;
-    while(bytes_to_write>0) {
-	bytes_written=write(fd,buf,bytes_to_write);
-	if(bytes_written==-1) return -1;
-	bytes_to_write-=bytes_written;
-    }
-    return bytes_in_buf;
+
+int copy_a_bit(int in_fd, int out_fd, int dribble_fd, char *message) {
+  return copy_a_bit_sendfd_recvfd(in_fd, out_fd, dribble_fd, -1, NULL, message);
 }
+int copy_a_bit_with_log(int in_fd, int out_fd, int dribble_fd, char * program, char *message) {
+  return copy_a_bit_sendfd_recvfd_with_log(in_fd, out_fd, dribble_fd, -1, NULL, program, message);
+}
+
+int copy_a_bit_sendfd(int in_fd, int out_fd, int dribble_fd, int send_fd, char *message) {
+  return copy_a_bit_sendfd_recvfd(in_fd, out_fd, dribble_fd, send_fd, NULL, message);
+}
+int copy_a_bit_recvfd_with_log(int in_fd, int out_fd, int dribble_fd, int * recv_fd, char * program, char *message) {
+  return copy_a_bit_sendfd_recvfd_with_log(in_fd, out_fd, dribble_fd, -1, recv_fd, program, message);
+}
+

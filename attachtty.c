@@ -26,7 +26,7 @@ void cleanup_signal_handler(int signal);
 
 */
 
-volatile int was_interrupted=0, was_suspended=0, time_to_die=0;
+volatile int was_interrupted=0, was_suspended=0, was_resized=0, time_to_die=0;
 void tears_in_the_rain(int signal) {
     time_to_die=signal;
     cleanup_signal_handler(signal);
@@ -36,6 +36,9 @@ void control_c_pressed(int signal) {
 }
 void control_z_pressed(int signal) {
     was_suspended=1;
+}
+void window_resized(int signal) {
+    was_resized=1;
 }
 
 void init_ctrl_z_handler(void)  {
@@ -72,6 +75,12 @@ void init_signal_handlers(void) {
     sigemptyset(&(act.sa_mask));
     act.sa_flags=0;
     sigaction(SIGINT,&act,0);
+
+    /* catch SIGWINCH and send window size over the link */
+    act.sa_handler=window_resized;
+    sigemptyset(&(act.sa_mask));
+    act.sa_flags=0;
+    sigaction(SIGWINCH,&act,0);
 
     /* catch SIGSTOP and cleanup tty before suspending */
     init_ctrl_z_handler();
@@ -183,10 +192,23 @@ int main(int argc,char *argv[], char *envp[]) {
     return 0;
 }
 
+
+int send_window_size(int fd)
+{
+    struct winsize my_winsize;
+
+    if (fd >= 0 && ioctl(0,TIOCGWINSZ,&my_winsize) == 0 && ioctl(fd,TIOCSWINSZ,&my_winsize) == 0)
+        return 0;
+
+    return -1;
+}
+
 /* copy between stdin,stdout and unix-domain socket */
 
 void connect_direct(char * path, char *text, int timeout) {
-    int sock=-1;
+    int sock=-1, pty_master=-1, ufds_n = 0;
+    int *recv_fd = &pty_master;
+    int text_len = text ? strlen(text) : 0;
     struct pollfd ufds[3];
     struct sockaddr_un s_a;
 
@@ -200,43 +222,68 @@ void connect_direct(char * path, char *text, int timeout) {
     if(connect(sock,(const struct sockaddr *) &s_a,sizeof s_a)!=0) 
 	    bail("attachtty","connect");
   
+    int time_end = time(NULL) + timeout;
+    int msec_left = -1;
+    
     if (text) {
-        int time_start = time(NULL);
-        int time_end = time_start + timeout;
-        int msec_left;
-        ufds[0].fd=sock; ufds[0].events=POLLIN | POLLOUT;
+        ufds[0].fd=sock; ufds[0].events=POLLIN|POLLOUT;
+        ufds_n=1;
+    } else {
+        ufds[0].fd=sock; ufds[0].events=POLLIN;
+        ufds[1].fd=0;    ufds[1].events=POLLIN|POLLHUP;
+        ufds_n=2;
+    }
 
-        while(! time_to_die) {
-            if (was_interrupted) {
-                was_interrupted=0;
-                write(sock,"\003",1);
+    while (!time_to_die) {
+
+        if (was_interrupted) {
+            was_interrupted=0;
+            write(sock,"\003",1);
+        }
+        if (was_suspended) {
+            was_suspended=0;
+            suspend_myself();
+        }
+        if (was_resized && pty_master >= 0) {
+            was_resized=0;
+            send_window_size(pty_master);
+        }
+        if (text)
+            msec_left = (time_end - time(NULL)) * 1000;
+        else
+            msec_left = -1;
+
+        if (poll(ufds, ufds_n, msec_left) == -1) {
+            if (errno == EINTR)
+                continue;
+            else
+                bail("attachtty", "poll");
+        }
+
+        if (ufds[0].revents & POLLIN) {
+            if (copy_a_bit_recvfd_with_log(sock,1,-1,recv_fd,"attachtty","copying from socket") == 0)
+                break;
+            /*
+              send window size as soon as we retrieve pty_master through the link.
+              later, we will send window size again each time we receive a SIGWINCH
+            */
+            if (recv_fd != NULL && pty_master >= 0) {
+                send_window_size(pty_master);
+                recv_fd = NULL;
             }
-	    if (was_suspended) {
-                was_suspended=0;
-	        suspend_myself();
-	    }
-            msec_left = (time_end - time(NULL)) * 1000;  
-            if (poll(ufds, 1, msec_left) == -1) {
-	       if (errno == EINTR)
-		   continue;
-	       else
-		   bail("attachtty", "poll");
-	    }
-	        
-            if (ufds[0].revents & POLLIN) {
-                if (copy_a_bit_with_log(sock,1,-1,"attachtty","copying from socket") == 0)
-                    break;
-            }
+        }
 	
-            if (text && (ufds[0].revents & POLLOUT)) {
-                int len = strlen(text);
-                int written = write(sock,text,len);
-                if (written == len) {
-                    ufds[0].events = POLLIN; /* no longer need to output */
-                    text = NULL;
-                    write(sock,"\r",1);
-                } else 
+        if (text) {
+            if (ufds[0].revents & POLLOUT) {
+                int written = write(sock,text,text_len);
+                if (written > 0) {
                     text += written;
+                    text_len -= written;
+                    if (text_len <= 0) {
+                        ufds[0].events = POLLIN; /* no longer need to output */
+                        write(sock,"\r",1);
+                    }
+                }
             }
 
             if (time(NULL) >= time_end) {
@@ -244,30 +291,7 @@ void connect_direct(char * path, char *text, int timeout) {
                 sock=-1;
                 time_to_die = 1;
             }
-        }
-    } else {
-        while(! time_to_die) {
-            if (was_interrupted) {
-                write(sock,"\003",1);
-                was_interrupted=0;
-            }
-	    if (was_suspended) {
-                was_suspended=0;
-	        suspend_myself();
-	    }
-            ufds[0].fd=sock; ufds[0].events=POLLIN;
-            ufds[1].fd=0; ufds[1].events=POLLIN|POLLHUP;
-            if (poll(ufds, 2, -1) == -1) {
-	       if (errno == EINTR)
-		   continue;
-	       else
-		   bail("attachtty", "poll");
-	    }
-	   
-	    if (ufds[0].revents & POLLIN) {
-                if (copy_a_bit_with_log(sock,1,-1,"attachtty","copying from socket") == 0)
-                    break;
-            }
+        } else {
             if (ufds[1].revents & POLLIN) {	
                 if (copy_a_bit_with_log(0,sock,-1,"attachtty","copying to socket") == 0)
                     break;

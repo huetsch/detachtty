@@ -70,7 +70,7 @@ void open_files(int signal) {
 
 int main(int argc,char *argv[], char *envp[]) {
     int pty_master;
-    int master_socket=-1,sock=-1,next_arg;
+    int master_socket=-1,sock=-1,send_fd=-1,next_arg;
     struct pollfd ufds[3];
     struct sockaddr_un s_a,their_addr;
 #ifdef __linux__
@@ -190,13 +190,15 @@ int main(int argc,char *argv[], char *envp[]) {
                 logprintf(MY_NAME, "poll returned -1");
                 continue;
             }
-            if(ufds[0].revents & POLLIN) 
-                copy_a_bit(pty_master,sock,dribble_fd,"copying from pty");
+            if(ufds[0].revents & POLLIN) {
+                if (copy_a_bit_sendfd(pty_master,sock,dribble_fd,send_fd,"copying from pty") > 0)
+                    send_fd = -1;
+            }
       
             if(ufds[1].revents & POLLIN) {
                 int new_sock = -1;
-                spare_integer=sizeof their_addr;
-                new_sock=accept(master_socket,(struct sockaddr *) &their_addr,
+                spare_integer = sizeof their_addr;
+                new_sock = accept(master_socket,(struct sockaddr *) &their_addr,
                                 &spare_integer);
                 if (new_sock >= 0)
                 {
@@ -204,8 +206,10 @@ int main(int argc,char *argv[], char *envp[]) {
                     if (CLIENT_CONNECTED)
                         close(sock);
                     sock = new_sock;
+                    send_fd = pty_master;
                     /* give them a copy of anything we read recently */
-                    output_buffer(sock);
+                    if (output_buffer_sendfd(sock, send_fd) > 0)
+                        send_fd = -1;
                     continue;
                 }
             }
