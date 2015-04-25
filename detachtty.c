@@ -152,6 +152,9 @@ int main(int argc,char *argv[], char *envp[]) {
     }
     open_files(0);
 
+    setlinebuf(stdout);
+    setlinebuf(stderr);
+
     pid=forkpty(&pty_master,NULL,&my_termios,&my_winsize);
     if(pid<0) {			/* error */
         perror("detach: Can't fork");

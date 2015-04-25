@@ -9,23 +9,23 @@
 
 FILE *log_fp=NULL;
 
-int logprintf(char *progname, char *msg,...) {
+int logprintf(char *progname, char *fmt,...) {
     int n;
     va_list ap;
-    va_start(ap, msg);
+    va_start(ap, fmt);
     fprintf(log_fp,";;; %s: %ld: ",progname,time(0));
-    n=vfprintf(log_fp,msg,ap);
+    n=vfprintf(log_fp,fmt,ap);
     va_end(ap);
     fputs("\r\n",log_fp);
     return n;
 }
 
-void bail(char *progname,char *msg,...) {
+void bail(char *progname,char *fmt,...) {
     va_list ap;
     int e=errno;
-    va_start(ap, msg);
+    va_start(ap, fmt);
     fprintf(log_fp,";;; %s: %ld: FATAL ",progname,time(0));
-    vfprintf(log_fp,msg,ap);
+    vfprintf(log_fp,fmt,ap);
     va_end(ap);
     /* use \r\n to avoid staircase effect */
     if(e>0) 

@@ -165,6 +165,9 @@ int main(int argc,char *argv[], char *envp[]) {
 
     init_signal_handlers();
 
+    setlinebuf(stdout);
+    setlinebuf(stderr);
+
     if (host) {
         logprintf("attachtty","connecting through ssh to %s on %s",path,host);
         connect_ssh(host,path,text,timeout_str);
