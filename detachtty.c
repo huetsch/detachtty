@@ -137,18 +137,23 @@ int main(int argc,char *argv[], char *envp[]) {
     }
     if(listen(master_socket,1)!=0) bail(MY_NAME,"listen");
     if(detach_p) {
+        int dev_null;
         if(daemon(1,1)) bail(MY_NAME, "daemon");
         /* we leave stderr open - if the user really wanted his tty back,
            he'd have specified --log-file */
-        close(0); close(1);
-        open("/dev/null",O_RDONLY);
-        dup(0);
+        close(0);
+        close(1);
+        dev_null = open("/dev/null",O_RDWR);
+        dup2(dev_null, 0);
+        dup2(dev_null, 1);
     }    
   
     if(pid_file_path) {
         FILE *fp=fopen(pid_file_path,"w");
-        fprintf(fp,"%d\n",getpid());
-        fclose(fp);
+        if (fp != NULL) {
+            fprintf(fp,"%d\n",(int)getpid());
+            fclose(fp);
+        }
     }
     open_files(0);
 
