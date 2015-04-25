@@ -72,7 +72,6 @@ void open_files(int signal) {
 
 int main(int argc,char *argv[], char *envp[]) {
     int pty_master;
-    char pty_name[]="/dev/pts/wherever/something"; /* XXX */
     int master_socket=-1,sock=-1,next_arg;
     struct pollfd ufds[3];
     struct sockaddr_un s_a,their_addr;
@@ -155,7 +154,7 @@ int main(int argc,char *argv[], char *envp[]) {
     }
     open_files(0);
 
-    pid=forkpty(&pty_master,pty_name,&my_termios,&my_winsize);
+    pid=forkpty(&pty_master,NULL,&my_termios,&my_winsize);
     if(pid<0) {			/* error */
         perror("detach: Can't fork");
         exit(1);

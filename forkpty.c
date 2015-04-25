@@ -44,6 +44,8 @@ int forkpty (int *amaster, char *name, struct termios
 	    ioctl(fds, TCSETS, termp);
 	if (winp)
 	    ioctl(fds, TIOCSWINSZ, winp);
+        if (fds > 2)
+            close(fds);
 	return pid;
     }
 }
