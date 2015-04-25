@@ -6,13 +6,13 @@
 #if defined(SCM_RIGHTS) && defined(CMSG_FIRSTHDR) && defined(CMSG_LEN) && defined(CMSG_DATA) && defined(CMSG_NXTHDR)
 # define DETACHTTY_SENDFD_RECVFD
 #else
-# warn compiling without SENDFD/RECVD support
+# warning compiling without SENDFD/RECVD support
 #endif
 
 
-enum { len_of_buf = 4096 };
+enum { buf_capacity = 4096 };
 static int bytes_in_buf = 0;
-static char buf[len_of_buf + 1];
+static char buf[buf_capacity + 1];
 
 #ifdef DETACHTTY_SENDFD_RECVFD
 int send_bytes_and_fd(int out_fd, const char * bytes, int bytes_to_write, int send_fd)
@@ -125,10 +125,10 @@ int input_buffer_recvfd(int in_fd, int dribble_fd, int * recv_fd) {
     int bytes_read = 0;
 #ifdef DETACHTTY_SENDFD_RECVFD
     if (recv_fd != NULL)
-        bytes_read = recv_bytes_and_fd(in_fd, buf, len_of_buf, recv_fd);
+        bytes_read = recv_bytes_and_fd(in_fd, buf, buf_capacity, recv_fd);
     else
 #endif
-        bytes_read = read(in_fd, buf, len_of_buf);
+        bytes_read = read(in_fd, buf, buf_capacity);
 
     if (bytes_read > 0) {
         /*
