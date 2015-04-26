@@ -55,7 +55,8 @@ static void reopen_files(int signal) {
             perror("fopen log file");
         setvbuf(log_fp, NULL, _IONBF, 0); /* don't buffer */
         if (signal > 0) 
-            logprintf(MY_NAME, "Got signal %d, reopened log file", signal);
+            logprintf(MY_NAME, "Got signal %d, reopened log file \"%s\"",
+                      signal, log_file_path);
     } else {
         log_fp = stderr;
     }
@@ -386,14 +387,14 @@ static void process_accumulated_signals(void) {
 }
 
 static void tidy_up_nicely(int signal) {
-    if (unlink(socket_path))
-        bail("detachtty", "unlinking %s", socket_path);
-    if (pid_file_path && unlink(pid_file_path) != 0)
-        perror(pid_file_path);
     if (signal)
         logprintf(MY_NAME, "got unexpected signal %d, exiting", signal);
     else
         logprintf(MY_NAME, "exiting", signal);
+    if (unlink(socket_path))
+        logprintf(MY_NAME, "error unlinking \"%s\": %s", socket_path, strerror(errno));
+    if (pid_file_path && unlink(pid_file_path) != 0)
+        logprintf(MY_NAME, "error unlinking \"%s\": %s", pid_file_path, strerror(errno));
     exit(signal);
 }
 
