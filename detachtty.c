@@ -142,7 +142,7 @@ int main(int argc,char *argv[], char *envp[]) {
         exit(1);
     } else if (pid==0) {
         /* child */
-        /* set_noecho(0); useful? */
+        set_noecho(0);
         execve(argv[next_arg],&argv[next_arg],envp);
         bail(MY_NAME,"detach: exec failed");
     } else {
@@ -304,7 +304,11 @@ static int bind_socket_or_bail(char * socket_path) {
     logprintf(MY_NAME, "Cannot create \"%s\": does it already exist from a previous run?",
               socket_path);
  bind_failed:
+    if (master_socket >= 0)
+        close(master_socket);
+
     bail(MY_NAME, "bind");
+    return -1;
 }
     
 
@@ -312,8 +316,9 @@ static int bind_socket_or_bail(char * socket_path) {
    http://www.yendor.com/programming/unix/apue/pty/main.c
 */
 
-static void set_noecho(int fd) /* turn off echo (for slave pty) */
-{
+/* turn off echo (for slave pty) */
+static void set_noecho(int fd) {
+#ifdef NEED_SET_NOECHO
     struct termios  stermios;
   
     if (tcgetattr(fd, &stermios) < 0)
@@ -329,6 +334,7 @@ static void set_noecho(int fd) /* turn off echo (for slave pty) */
 #endif
     if (tcsetattr(fd, TCSANOW, &stermios) < 0)
         bail("detach child","tcsetattr error");
+#endif /* NEED_SET_NOECHO */
 }
 
 static void cleanup_signal_handler(int sig) {

@@ -3,9 +3,9 @@
 # for details
 
 # Linux 2.4
-OS_CFLAGS=-DNEED_PTY_H                       
+OS_CFLAGS=-DNEED_PTY_H -fno-strict-aliasing
 # FreeBSD, version unknown
-#OS_CFLAGS=-DNEED_LIBUTIL_H                  
+#OS_CFLAGS=-DNEED_LIBUTIL_H
 # Solaris, some version of
 #OS_CFLAGS=-DNEED_STRINGS_H -DNEED_LOCAL_FORKPTY_H
 # MacOS X needs the local forkpty, and < 10.3 needs libpoll from fink
@@ -13,11 +13,11 @@ OS_CFLAGS=-DNEED_PTY_H
 
 # -lutil has forkpty() in it in Linux 2.4, and apparently at least
 # doesn't break anything in FreeBSD.
-OS_LOADLIBES=-lutil
+OS_LDLIBS=-lutil
 # Solaris users need this instead
-#OS_LOADLIBES=-lnsl -lsocket
+#OS_LDLIBS=-lnsl -lsocket
 # MacOS X <10.3 needs libpoll from fink, later versions don't
-# OS_LOADLIBES=-L/sw/lib -lpoll
+# OS_LDLIBS=-L/sw/lib -lpoll
 
 OS_OBJECTS=
 # no forkpty in Solaris or MacOS X
@@ -27,11 +27,14 @@ INSTALL_DIR=/usr/local/bin
 
 # You probably don't need to edit anything below this line
 
-CFLAGS=-g $(OS_CFLAGS)
-LOADLIBES=$(OS_LOADLIBES)
+ADD_CFLAGS=
+ADD_LDLIBS=
+
+CFLAGS=$(OS_CFLAGS) $(ADD_CFLAGS)
+LDLIBS=$(OS_LDLIBS) $(ADD_LDLIBS)
 
 all: detachtty attachtty
-clean: 
+clean:
 	rm -f *.o *~ attachtty detachtty
 
 install: all
