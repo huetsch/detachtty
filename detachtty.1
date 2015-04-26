@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH DETACHTTY 1 "May 31, 2001"
+.TH DETACHTTY 1 "Mar 18, 2006"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -27,10 +27,13 @@ detachtty, attachtty \- run an interactive program with io to a unix-domain sock
 .RI [ arguments-to-command ] ...
 .br
 .B attachtty 
-.I /var/run/cliki-socket
+.I socket-path
+.RI [ command ]
+.RI [ timeout ]
 .br
 .B attachtty 
-.I username@f.q.d.n:/var/run/cliki-socket
+.I username@host:socket-path
+.RI [ command ]
 .SH DESCRIPTION
 .B detachtty 
 lets you run interactive programs non-interactively, and connect to
@@ -61,28 +64,31 @@ detachtty has
 
 .SH OPTIONS
 These programs approximately follow the usual GNU command line syntax,
-using long options that start with two dashes (`--').  For \fBdetachtty\fR,
-the options are
+using long options that start with two dashes (`--').
+
+.PP
+For \fBdetachtty\fR, the options are:
 
 .TP
 .B \-\-no\-detach
 Don't fork into the background.  Useful if you wish to start the
-program from inittab(5)
+program from
+.BR inittab (5).
 .TP
 .BI \-\-dribble\-file \ \ dribblename
 All input from and to the program being run is copied into 
 .I dribblename
-(if unspecified, it is discarded)
+(if unspecified, it is discarded).
 .TP
 .BI \-\-log\-file \ \ name
 Status messages (client connects, disconnects, errors) are sent to
 .I name
-(if unspecified, they go to standard error)
+(if unspecified, they go to standard error).
 .TP 
 .BI \-\-pid\-file \ \ pidname
-The process ID of detachtty is written to 
+The process ID of attachtty is written to 
 .I pidname.
-See \fBSIGNALS\fR
+See \fBSIGNALS\fR.
 .TP
 .I socket-path
 The unix-domain socket.  If access to \fIcommand\fR should be in any
@@ -91,20 +97,35 @@ you put it in a mode 700 directory.
 .TP 
 .I command arguments
 The command to run (which is searched for in the normal way).  All
-remaining command line parameters are passed to it as arguments
-.P
+remaining command line parameters are passed to it as arguments.
+
+.PP
 .B attachtty
-takes a single argument, which is either the path to
-\fIsocket-path\fR, or a "remote path" of the form 
+takes the following arguments:
+
+.TP
+.I socket-path
+This is either the path to \fIsocket-path\fR, or a "remote path" of
+the form
 .IR username @ host : socket-path
 where 
 .IR username @ host 
 is passed to ssh.  No provision is made to accept password input,
 so ssh must be able to make a connection without needing it.  See 
-.BR ssh-agent (1)
+.BR ssh-agent (1).
 .P
+.TP
+.I command
+The command to run (which is searched for in the normal way) without
+any arguments.
+.TP
+.I timeout
+The maximum timeout in seconds (defaults to 1).  This is available
+only for local connections.
+
+.PP
 To detach from the tty without exiting from the server process, send
-attachtty any signal that it doesn't catch.  See the SIGNALS section
+attachtty any signal that it doesn't catch.  See the SIGNALS section.
 .P
 .SH NOTES
 .P
@@ -127,7 +148,7 @@ will cause detachtty to close and reopen its log files.
 .P
 Sending \fBSIGQUIT\fR to an \fIattachtty\fR process (usually from the
 keyboard with ^\\) will cause it to detach from the tty and quit leaving
-the server process running.  Sometimes you need to press it twice
+the server process running.  Sometimes you need to press it twice.
 .SH SEE ALSO
 .BR screen (1),
 .BR ssh (1),
@@ -136,4 +157,5 @@ the server process running.  Sometimes you need to press it twice
 .br
 .SH AUTHOR
 Written by Daniel Barlow <dan@telent.net>, and a cast of units.
-
+Modified by Luca Capello <luca@pca.it>.
+Modified by Mark Huetsch <markhuetsch@gmail.com>.

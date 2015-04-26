@@ -1,5 +1,4 @@
 #include "config.h"
-#include <errno.h>
 
 static char buf[4097];
 static int bytes_in_buf=0;
@@ -14,10 +13,8 @@ int copy_a_bit(int in_fd, int out_fd, int dribble_fd, char *message) {
     if(!bytes_in_buf) return 0;
     output_buffer(dribble_fd);
     if(output_buffer(out_fd)==-1) {
-	if(errno != EPIPE) {
-	    perror(message);
-	    exit(1);
-	}
+	perror(message);
+	exit(1);
     }
     return bytes_in_buf;
 }
