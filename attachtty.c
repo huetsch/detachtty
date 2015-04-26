@@ -16,6 +16,8 @@ static void cleanup_signal_handler(int signal);
 # define UNIX_PATH_MAX    108
 #endif
 
+static char * const MY_NAME = "attachtty";
+
 /*
   attachtty /path/to/socket [text-to-send [timeout]]
  
@@ -182,16 +184,16 @@ int main(int argc,char *argv[], char *envp[]) {
     setlinebuf(stderr);
 
     if (host) {
-        logprintf("attachtty","connecting through ssh to %s on %s",path,host);
+        logprintf(MY_NAME,"connecting through ssh to %s on %s",path,host);
         connect_ssh(host,path,text,timeout_str);
     } else {
-        logprintf("attachtty","connecting directly to %s",path);
+        logprintf(MY_NAME,"connecting directly to %s",path);
         init_tty();
         connect_direct(path,text,timeout);
         cleanup_tty();
     }
     if (time_to_die != 0) {
-        logprintf("attachtty","got signal %d, closing down",time_to_die);
+        logprintf(MY_NAME,"got signal %d, exiting",time_to_die);
     }
     return 0;
 }
@@ -221,10 +223,10 @@ void connect_direct(char * path, char *text, int timeout) {
     s_a.sun_path[UNIX_PATH_MAX-1]='\0';
   
     sock=socket(PF_UNIX,SOCK_STREAM,0);
-    if(sock==-1) bail("attachtty","socket");
+    if(sock==-1) bail(MY_NAME,"socket");
   
     if(connect(sock,(const struct sockaddr *) &s_a,sizeof s_a)!=0) 
-	    bail("attachtty","connect");
+	    bail(MY_NAME,"connect");
   
     int time_end = time(NULL) + timeout;
     int msec_left = -1;
@@ -261,11 +263,12 @@ void connect_direct(char * path, char *text, int timeout) {
             if (errno == EINTR)
                 continue;
             else
-                bail("attachtty", "poll");
+                bail(MY_NAME, "poll");
         }
 
         if (ufds[0].revents & POLLIN) {
-            if (copy_a_bit_recvfd_with_log(sock,1,-1,recv_fd,"attachtty","copying from socket") == 0)
+            if (copy_a_bit_recvfd_with_log(sock,1,-1,recv_fd, MY_NAME,
+                                           "copying from socket, exiting") == 0)
                 break;
             /*
               send window size as soon as we retrieve pty_master through the link.
@@ -297,11 +300,11 @@ void connect_direct(char * path, char *text, int timeout) {
             }
         } else {
             if (ufds[1].revents & POLLIN) {	
-                if (copy_a_bit_with_log(0,sock,-1,"attachtty","copying to socket") == 0)
+                if (copy_a_bit_with_log(0,sock,-1,MY_NAME, "copying to socket, exiting") == 0)
                     break;
             }
             if (ufds[1].revents & POLLHUP) {
-                logprintf("attachtty","closed connection due to hangup");
+                logprintf(MY_NAME, "closed connection due to hangup, exiting");
                 break;
             }
         }
@@ -317,7 +320,7 @@ void connect_ssh(char *host, char *path, char *text, char *timeout_str) {
      * including -icanon -iecho flags and forwarding of CTRL+C
      */
     execlp("ssh", "ssh", "-t", host, "attachtty", path, text, timeout_str, (char *)NULL);
-    bail("attachtty", "exec ssh failed");
+    bail(MY_NAME, "exec ssh failed");
 }
 
 /* 

@@ -174,7 +174,7 @@ int copy_a_bit_sendfd_recvfd_with_log(int in_fd, int out_fd, int dribble_fd,
 {
     int n = copy_a_bit_sendfd_recvfd(in_fd, out_fd, dribble_fd, send_fd, recv_fd, message);
     if (n==0)
-        logprintf(program, "%s %s", "closed connection due to zero-length read while", message);
+        logprintf(program, "%s %s", "end-of-file while", message);
     return n;
 }
 

@@ -166,11 +166,11 @@ int main(int argc,char *argv[], char *envp[]) {
             process_accumulated_signals();
 
             if (ufds[0].revents & POLLIN) {
-                if (copy_a_bit_sendfd(pty_master,sock,dribble_fd,send_fd,"copying from pty") > 0)
+                if (copy_a_bit_sendfd(pty_master,sock,dribble_fd,send_fd,"copying from child") > 0)
                     send_fd = -1;
             }
             if (ufds[0].revents & POLLHUP) {
-                logprintf(MY_NAME, "Child terminated, exiting");
+                logprintf(MY_NAME, "child terminated, exiting");
                 if (sock>=0) { close(sock); sock=-1; }
                 tidy_up_nicely(0);
             }
@@ -200,7 +200,7 @@ int main(int argc,char *argv[], char *envp[]) {
             }
             if (CLIENT_CONNECTED && (ufds[2].revents & POLLIN)) {	
                 if (copy_a_bit_with_log(sock, pty_master, dribble_fd,
-                                        MY_NAME, "copying to pty") == 0) {
+                                        MY_NAME, "copying from socket, closing connection") == 0) {
                     /* end-of-file on socket */
                     if (sock >= 0) { close(sock); sock=-1; }
                 }
