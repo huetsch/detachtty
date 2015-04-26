@@ -141,7 +141,7 @@ int main(int argc,char *argv[], char *envp[]) {
         exit(1);
     } else if (pid==0) {
         /* child */
-        set_noecho(0);
+        /* set_noecho(0); useful? */
         execve(argv[next_arg],&argv[next_arg],envp);
         bail(MY_NAME,"detach: exec failed");
     } else {
