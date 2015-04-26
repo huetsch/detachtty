@@ -7,32 +7,32 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-FILE *log_fp=NULL;
+FILE *log_fp = NULL;
 
-int logprintf(char *progname, char *fmt,...) {
-    int n;
+int logprintf(char *progname, char *format,...) {
     va_list ap;
-    va_start(ap, fmt);
-    fprintf(log_fp,";;; %s: %ld: ",progname,time(0));
-    n=vfprintf(log_fp,fmt,ap);
+    int n;
+    va_start(ap, format);
+    fprintf(log_fp, ";;; %s: %ld: ", progname, time(NULL));
+    n=vfprintf(log_fp, format, ap);
     va_end(ap);
     fputs("\r\n",log_fp);
     return n;
 }
 
-void bail(char *progname,char *fmt,...) {
+void bail(char *progname,char *format,...) {
     va_list ap;
-    int e=errno;
-    va_start(ap, fmt);
-    fprintf(log_fp,";;; %s: %ld: FATAL ",progname,time(0));
-    vfprintf(log_fp,fmt,ap);
+    int err = errno;
+    va_start(ap, format);
+    fprintf(log_fp,";;; %s: %ld: FATAL ", progname, time(NULL));
+    vfprintf(log_fp, format, ap);
     va_end(ap);
     /* use \r\n to avoid staircase effect */
-    if(e>0) 
-	fprintf(log_fp," (%s)\r\n",strerror(e));
+    if (err > 0) 
+	fprintf(log_fp, " (%s)\r\n", strerror(err));
     else
 	fputs("\r\n",log_fp);
 
-    kill(getpid(),15);
+    kill(getpid(), SIGTERM);
 }
 

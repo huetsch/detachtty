@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -159,14 +160,17 @@ int copy_a_bit_sendfd_recvfd(int in_fd, int out_fd, int dribble_fd,
     if (input_buffer_recvfd(in_fd, dribble_fd, recv_fd) <= 0)
        return 0;
     if (output_buffer_sendfd(out_fd, send_fd) < 0) {
-	perror(message);
-	exit(1);
+        if (errno != EPIPE) {
+            perror(message);
+            exit(1);
+        }
     }
     return bytes_in_buf;
 }
 
 int copy_a_bit_sendfd_recvfd_with_log(int in_fd, int out_fd, int dribble_fd,
-                                      int send_fd, int * recv_fd, char * program, char *message)
+                                      int send_fd, int * recv_fd,
+                                      char * program, char *message)
 {
     int n = copy_a_bit_sendfd_recvfd(in_fd, out_fd, dribble_fd, send_fd, recv_fd, message);
     if (n==0)
@@ -176,16 +180,29 @@ int copy_a_bit_sendfd_recvfd_with_log(int in_fd, int out_fd, int dribble_fd,
 
 
 int copy_a_bit(int in_fd, int out_fd, int dribble_fd, char *message) {
-  return copy_a_bit_sendfd_recvfd(in_fd, out_fd, dribble_fd, -1, NULL, message);
+    return copy_a_bit_sendfd_recvfd(in_fd, out_fd, dribble_fd, -1, NULL, message);
 }
-int copy_a_bit_with_log(int in_fd, int out_fd, int dribble_fd, char * program, char *message) {
-  return copy_a_bit_sendfd_recvfd_with_log(in_fd, out_fd, dribble_fd, -1, NULL, program, message);
-}
-
-int copy_a_bit_sendfd(int in_fd, int out_fd, int dribble_fd, int send_fd, char *message) {
-  return copy_a_bit_sendfd_recvfd(in_fd, out_fd, dribble_fd, send_fd, NULL, message);
-}
-int copy_a_bit_recvfd_with_log(int in_fd, int out_fd, int dribble_fd, int * recv_fd, char * program, char *message) {
-  return copy_a_bit_sendfd_recvfd_with_log(in_fd, out_fd, dribble_fd, -1, recv_fd, program, message);
+int copy_a_bit_with_log(int in_fd, int out_fd,
+                        int dribble_fd, char * program, char *message) {
+    return copy_a_bit_sendfd_recvfd_with_log(in_fd, out_fd, dribble_fd, -1, NULL, program, message);
 }
 
+int copy_a_bit_sendfd(int in_fd, int out_fd,
+                      int dribble_fd, int send_fd, char *message) {
+    return copy_a_bit_sendfd_recvfd(in_fd, out_fd,
+                                    dribble_fd, send_fd, NULL, message);
+}
+int copy_a_bit_recvfd_with_log(int in_fd, int out_fd,
+                               int dribble_fd, int * recv_fd,
+                               char * program, char *message) {
+    return copy_a_bit_sendfd_recvfd_with_log(in_fd, out_fd,
+                                             dribble_fd, -1, recv_fd,
+                                             program, message);
+}
+
+
+/* 
+ * Local Variables:
+ * c-basic-offset: 4
+ * End:
+ */

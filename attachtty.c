@@ -9,21 +9,22 @@ void connect_ssh(char *host, char *path, char *text, char *timeout) ;
 
 int init_tty(void);
 int cleanup_tty(void);
-void init_signal_handlers(void);
-void cleanup_signal_handler(int signal);
+static void init_signal_handlers(void);
+static void cleanup_signal_handler(int signal);
 
-#define UNIX_PATH_MAX 108
+#ifndef UNIX_PATH_MAX
+# define UNIX_PATH_MAX    108
+#endif
 
 /*
-  $0 /tmp/my-socket
+  attachtty /path/to/socket [text-to-send [timeout]]
  
   or
 
-  $0 user@hostname:/tmp/my-socket
+  attachtty user@hostname:/path/to/socket [text-to-send [timeout]]
 
   In the latter case, we open an ssh connection to user@hostname then
-  run $0 on the remote machine with the remainder of the command
-
+  run attachtty on the remote machine with the remainder of the arguments
 */
 
 volatile int was_interrupted=0, was_suspended=0, was_resized=0, time_to_die=0;
@@ -66,9 +67,12 @@ void suspend_myself(void) {
 }
 
 
-void init_signal_handlers(void) {
+static void init_signal_handlers(void) {
     struct sigaction act;
-    int i, fatal_sig[] = { SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE, SIGSEGV, SIGPIPE, SIGTERM, SIGSTKFLT, SIGCHLD, SIGXCPU, SIGXFSZ, };
+    int i, fatal_sig[] = {
+        SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE, SIGSEGV, SIGPIPE,
+        SIGTERM, SIGSTKFLT, SIGCHLD, SIGXCPU, SIGXFSZ,
+    };
     
     /* catch SIGINT and send character \003 over the link */
     act.sa_handler=control_c_pressed;
@@ -94,12 +98,12 @@ void init_signal_handlers(void) {
     }
 }
 
-void cleanup_signal_handler(int sig) {
+static void cleanup_signal_handler(int sig) {
     struct sigaction act;
-    act.sa_handler=SIG_DFL;
+    act.sa_handler = SIG_DFL;
     sigemptyset(&(act.sa_mask));
-    act.sa_flags=0;
-    sigaction(sig,&act,0);
+    act.sa_flags = 0;
+    sigaction(sig, &act, 0);
 }
 
 

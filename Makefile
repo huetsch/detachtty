@@ -8,7 +8,7 @@ OS_CFLAGS=-DNEED_PTY_H
 #OS_CFLAGS=-DNEED_LIBUTIL_H                  
 # Solaris, some version of
 #OS_CFLAGS=-DNEED_STRINGS_H -DNEED_LOCAL_FORKPTY_H
-# MacOS X needs libpoll from fink
+# MacOS X needs the local forkpty, and < 10.3 needs libpoll from fink
 # OS_CFLAGS=-DNEED_LOCAL_FORKPTY_H -I/sw/include
 
 # -lutil has forkpty() in it in Linux 2.4, and apparently at least
@@ -16,7 +16,7 @@ OS_CFLAGS=-DNEED_PTY_H
 OS_LOADLIBES=-lutil
 # Solaris users need this instead
 #OS_LOADLIBES=-lnsl -lsocket
-# MacOS X with libpoll from fink
+# MacOS X <10.3 needs libpoll from fink, later versions don't
 # OS_LOADLIBES=-L/sw/lib -lpoll
 
 OS_OBJECTS=
@@ -39,8 +39,8 @@ install: all
 
 deb:
 	rm -rf /usr/local/src/Packages/detachtty/ 
-	CVSROOT=`cat CVS/Root` cvs-buildpackage -F -uc -us -rfakeroot
-	lintian /usr/local/src/Packages/detachtty/detachtty*.changes
+	CVSROOT=`cat CVS/Root` cvs-buildpackage -W/usr/local/src/Packages -F -uc -us -rfakeroot
+	lintian /usr/local/src/Packages/detachtty*.changes
 
 detachtty: detachtty.o copy-stream.o errors.o $(OS_OBJECTS)
 attachtty: attachtty.o copy-stream.o errors.o $(OS_OBJECTS)
