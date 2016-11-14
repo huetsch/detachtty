@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <sys/stat.h>
+#include <pty.h>
 #include <fcntl.h>
 
 #ifndef UNIX_PATH_MAX
@@ -12,15 +13,14 @@ static char * const MY_NAME = "detachtty";
 
 /*
   Create child process and establish the slave pseudo terminal as the
-  child's controlling terminal.  
+  child's controlling terminal.
   extern int forkpty __P ((int *__amaster, char *__name,
   struct termios *__termp, struct winsize *__winp));
   __amaster=fd of master pty
   __name = name of master pty, must be long enough.  how do we know?
-  
+
   In the child, also dups the slave device to fds 0,1,2 and calls setsid()
   (which causes the right process group stuff to happen too)
-  
 */
 
 static int  parse_args(int argc, char *argv[], int * next_arg_ptr);
@@ -36,7 +36,6 @@ static void tidy_up_nicely(int signal);
   2) open network socket, listen to it - backlog 0
   (should be unix-domain socket)
   3) accept a single connection
-
 */
 
 static char *socket_path=NULL;
@@ -54,7 +53,7 @@ static void reopen_files(int signal) {
         if (log_fp==NULL)
             perror("fopen log file");
         setvbuf(log_fp, NULL, _IONBF, 0); /* don't buffer */
-        if (signal > 0) 
+        if (signal > 0)
             logprintf(MY_NAME, "Got signal %d, reopened log file \"%s\"",
                       signal, log_file_path);
     } else {
@@ -64,7 +63,7 @@ static void reopen_files(int signal) {
         if (dribble_fd >= 0)
             close(dribble_fd);
         dribble_fd = open(dribble_path, O_WRONLY|O_CREAT|O_APPEND,0600);
-        if (dribble_fd < 0) 
+        if (dribble_fd < 0)
             logprintf(MY_NAME,"Cannot open dribble file %s", dribble_path);
     }
 }
@@ -83,7 +82,7 @@ static void usage(char *name,char *offending_option) {
             name);
 }
 
-    
+
 #define CLIENT_CONNECTED (sock>=0)
 
 int main(int argc,char *argv[], char *envp[]) {
@@ -95,7 +94,7 @@ int main(int argc,char *argv[], char *envp[]) {
     mode_t old_umask;
 
     log_fp = stderr;	/* may be changed by parse_args */
-  
+
     detach_p = parse_args(argc, argv, &next_arg);
 
     /* this assumes we're started from a shell.  would be smart to 
@@ -106,10 +105,10 @@ int main(int argc,char *argv[], char *envp[]) {
     old_umask = umask(077);
     master_socket = bind_socket_or_bail(socket_path);
     umask(old_umask);
-    
+
     if (listen(master_socket, 1) != 0)
         bail(MY_NAME,"listen");
-    
+
     if (detach_p) {
         int dev_null;
         if (daemon(1, 1))
@@ -121,8 +120,8 @@ int main(int argc,char *argv[], char *envp[]) {
         dev_null = open("/dev/null",O_RDWR);
         dup2(dev_null, 0);
         dup2(dev_null, 1);
-    }    
-  
+    }
+
     if (pid_file_path) {
         FILE *fp = fopen(pid_file_path, "w");
         if (fp != NULL) {
@@ -175,7 +174,7 @@ int main(int argc,char *argv[], char *envp[]) {
                 if (sock>=0) { close(sock); sock=-1; }
                 tidy_up_nicely(0);
             }
-      
+
             if (ufds[1].revents & POLLIN) {
                 struct sockaddr_un their_addr;
 #ifdef __linux__
@@ -199,7 +198,7 @@ int main(int argc,char *argv[], char *envp[]) {
                     continue;
                 }
             }
-            if (CLIENT_CONNECTED && (ufds[2].revents & POLLIN)) {	
+            if (CLIENT_CONNECTED && (ufds[2].revents & POLLIN)) {
                 if (copy_a_bit_with_log(sock, pty_master, dribble_fd,
                                         MY_NAME, "copying from socket, closing connection") == 0) {
                     /* end-of-file on socket */
@@ -257,7 +256,7 @@ static int bind_socket_or_bail(char * socket_path) {
     struct sockaddr_un addr;
     FILE * fp = NULL;
     int master_socket, oldpid = -1;
-    
+
     master_socket = socket(PF_UNIX, SOCK_STREAM, 0);
     if (master_socket < 0) {
         bail(MY_NAME, "socket");
@@ -265,14 +264,14 @@ static int bind_socket_or_bail(char * socket_path) {
     addr.sun_family=AF_UNIX;
     strncpy(addr.sun_path, socket_path, UNIX_PATH_MAX);
     addr.sun_path[UNIX_PATH_MAX-1] = '\0';
-    
+
     if (bind(master_socket, (const struct sockaddr *) &addr, sizeof(addr)) == 0) {
         return master_socket;
     }
     if (!pid_file_path) {
         goto no_pid;
     }
-    fp = fopen(pid_file_path,"r");            
+    fp = fopen(pid_file_path,"r");
     if (fp) {
         if (fgets(pidbuf, sizeof(pidbuf), fp)) {
             oldpid = atoi(pidbuf);
@@ -293,13 +292,13 @@ static int bind_socket_or_bail(char * socket_path) {
     }
     logprintf(MY_NAME, "found and removed stale socket \"%s\" from a previous run",
               socket_path);
-    
+
     if (bind(master_socket, (const struct sockaddr *) &addr, sizeof(addr)) == 0) {
         return master_socket;
     } else {
         goto bind_failed;
     }
-    
+
  no_pid:
     logprintf(MY_NAME, "Cannot create \"%s\": does it already exist from a previous run?",
               socket_path);
@@ -310,7 +309,7 @@ static int bind_socket_or_bail(char * socket_path) {
     bail(MY_NAME, "bind");
     return -1;
 }
-    
+
 
 /* borrowed from APUE example code found at
    http://www.yendor.com/programming/unix/apue/pty/main.c
@@ -320,10 +319,10 @@ static int bind_socket_or_bail(char * socket_path) {
 static void set_noecho(int fd) {
 #ifdef NEED_SET_NOECHO
     struct termios  stermios;
-  
+
     if (tcgetattr(fd, &stermios) < 0)
         bail("detach child","tcgetattr error");
-  
+
     stermios.c_lflag &= ~(ECHO | ECHOE | ECHOK | ECHONL);
     stermios.c_lflag|=ICANON;
     /* stermios.c_oflag &= ~(ONLCR); */
@@ -359,7 +358,7 @@ static void init_signal_handlers(void) {
     int i, fatal_sig[] = { SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE,
                            SIGSEGV, /*SIGPIPE,*/ SIGTERM, SIGSTKFLT, SIGCHLD,
                            SIGXCPU, SIGXFSZ, };
-    
+
     /* catch SIGCHLD, SIGQUIT, SIGTERM, SIGILL, SIGFPE... and exit */
     act.sa_handler = fatal_signal_handler;
     sigemptyset(&(act.sa_mask));
@@ -405,7 +404,7 @@ static void tidy_up_nicely(int signal) {
 }
 
 
-/* 
+/*
  * Local Variables:
  * c-basic-offset: 4
  * End:
