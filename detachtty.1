@@ -147,9 +147,10 @@ pathnames for all filename arguments.
 Sending \fBSIGHUP\fR to the process identified by \fIpidname\fR
 will cause detachtty to close and reopen its log files.
 .P
-Sending \fBSIGQUIT\fR to an \fIattachtty\fR process (usually from the
-keyboard with ^\\) will cause it to detach from the tty and quit leaving
-the server process running.  Sometimes you need to press it twice.
+Sending \fBSIGTSTP\fR or \fBSIGQUIT\fR to an \fIattachtty\fR process
+(usually from the keyboard with ^Z or ^\\) will cause it to detach
+from the tty and quit, leaving the server process running.
+Sometimes you need to press it twice.
 .SH SEE ALSO
 .BR screen (1),
 .BR ssh (1),

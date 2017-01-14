@@ -53,6 +53,8 @@
 #include "forkpty.h"
 #endif
 
+#define DETACHTTY_VERSION_STR "11"
+
 int copy_a_bit(int in_fd, int out_fd, int dribble_fd, char *message);
 int copy_a_bit_with_log(int in_fd, int out_fd, int dribble_fd,
                         char * program, char *message);

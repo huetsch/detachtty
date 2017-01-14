@@ -49,6 +49,7 @@ static int  parse_args(int argc, char *argv[], int * next_arg_ptr);
 static void set_noecho(int fd);
 static int  bind_socket_or_bail(char * socket_path);
 static void usage(char *name,char *offending_option);
+static void version(void);
 static void init_signal_handlers(void);
 static void process_accumulated_signals(void);
 static void tidy_up_nicely(int signal);
@@ -99,9 +100,19 @@ static void usage(char *name,char *offending_option) {
         fprintf(stderr, "%s: unrecognized arguments\n",
                 name);
     fprintf(stderr,"usage:\n"
-            " %s [--no-detach] [--dribble-file name] [--log-file name] \\\n"
+            " %s [--version] [--no-detach] [--dribble-file name] [--log-file name] \\\n"
             "   [--pid-file name] socket-path /path/to/command [arg] [arg] [arg] ...\n",
             name);
+}
+
+static void version(void) {
+    fprintf(stdout,"detachtty version %s\n%s", DETACHTTY_VERSION_STR,
+            "Copyright (C) 2016-2017 Massimiliano Ghilardi\n"
+            "Copyright (C) 2001-2005 Daniel Barlow\n"
+            "License GPLv2+: GNU GPL version 2 or later <http://www.gnu.org/licenses/>.\n"
+            "\n"
+            "This is free software: you are free to change and redistribute it.\n"
+            "There is NO WARRANTY, to the extent permitted by law.\n");
 }
 
 
@@ -250,6 +261,10 @@ static int parse_args(int argc, char *argv[], int * next_arg_ptr) {
         }
         else if (!strcmp("--pid-file", argv[next_arg])) {
             pid_file_path = argv[++next_arg];
+        }
+        else if (!strcmp("--version", argv[next_arg])) {
+            version();
+            exit(0);
         }
         else if (!strncmp("--", argv[next_arg], 2)) {
             usage(argv[0], argv[next_arg]);
