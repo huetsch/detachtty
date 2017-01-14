@@ -115,17 +115,22 @@ time to think of an alternative plan.
 
 * Where to get it
 
-detachtty is part of the Debian GNU/Linux system.  Debian "woody" and
-"sid" users should find that "apt-get install detachtty" will download
-and install it for them.
+detachtty development is hosted at <URL:https://github.com/cosmos72/detachtty>
 
-Users of other platforms are invited to check the CLiki page at
-<URL:http://www.cliki.net/detachtty> which should always contain
-a link to a download location.
+Also, your distribution may (or may not) already contain it.
+If it does, you will find that:
+
+- on Debian, Ubuntu and other GNU/Linux systems that use ".deb" packages,
+  "apt-get install detachtty" will download and install it
+- on RedHat, Fedora, CentOS and other GNU/Linux systems that use ".rpm" packages,
+  "yum install detachtty" will download and install it
+
+Users of platforms that do not contain detachtty can download it from
+<URL:https://github.com/cosmos72/detachtty/archive/master.tar.gz>
+and compile and install it manually - see the INSTALL file inside the
+downloaded package.
 
 
 * Feedback, feature requests, patches
 
-to dan@telent.net, or using the Debian bug tracking system (bug reports 
-can be sent to the BTS even if you're not using Debian; it's exactly
-the same package either way), or leave a note on the CLiki page
+Use github issues at <URL:https://github.com/cosmos72/detachtty/issues>
