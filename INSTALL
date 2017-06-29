@@ -8,13 +8,13 @@ vi Makefile
 make
 make install
 
-... or on a Debian (woody, sid, or later) box:
+Or, if your distribution already contains detachtty:
 
-apt-get install detachtty
+- on Debian, Ubuntu and other GNU/Linux systems that use ".deb" packages,
+  "apt-get install detachtty" will download and install it
+- on RedHat, Fedora, CentOS and other GNU/Linux systems that use ".rpm" packages,
+  "yum install detachtty" will download and install it
 
-This is a native Debian package, which means that if you are having
-trouble with the Debian version there is usually little point in
-trying the upstream version to see if it's improved.
 
 PORTING
 
@@ -24,18 +24,14 @@ detachtty is tested primarily on GNU/Linux boxes.  It should work on
 but you may need to tune things
 
 (1) Look at the Makefile.  Alter OS_CFLAGS, OS_LOADLIBES, OS_OBJECTS
-as necessary.
+    as necessary.
 
-(2) If that's insufficient (e.g. you need more header files), add the
-necessary stanzas to config.h and return to step 1
+(2) If that's insufficient (e.g. you need more header files),
+    add the necessary stanzas to config.h and return to step 1
 
-(3) If that's still insufficent, do something else reasonably tasteful,
-or mail me describing what else you need
+(3) If that's still insufficent, do something else reasonably tasteful
+    (Note from original author Daniel Barlow: NB: auto* is _not_ reasonably tasteful)
 
-(4) Send me your patch
-
-(NB: auto* is _not_ reasonably tasteful)
-
-
-
-dan@telent.net
+(4) Send your patch (or as last resort, your problem) to the maintainer.
+    The preferred channel is to open a github issue at
+    https://github.com/cosmos72/detachtty/issues

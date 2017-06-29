@@ -86,7 +86,7 @@ Status messages (client connects, disconnects, errors) are sent to
 (if unspecified, they go to standard error).
 .TP 
 .BI \-\-pid\-file \ \ pidname
-The process ID of attachtty is written to 
+The process ID of detachtty is written to 
 .I pidname.
 See \fBSIGNALS\fR.
 .TP
@@ -100,8 +100,7 @@ The command to run (which is searched for in the normal way).  All
 remaining command line parameters are passed to it as arguments.
 
 .PP
-.B attachtty
-takes the following arguments:
+For \fBattachtty\fR, the options are instead:
 
 .TP
 .I socket-path
@@ -110,18 +109,20 @@ the form
 .IR username @ host : socket-path
 where 
 .IR username @ host 
-is passed to ssh.  No provision is made to accept password input,
-so ssh must be able to make a connection without needing it.  See 
-.BR ssh-agent (1).
-.P
+is passed to ssh. The latter form is currently an alias for 
+\fIssh -t\fR
+.IR username @ host
+\fIattachtty socket-path [text]\fR
+and lets ssh manage the authentication, i.e. whether to ask for a password or not.
 .TP
-.I command
-The command to run (which is searched for in the normal way) without
-any arguments.
+.I text
+The text to write into the socket. It will be processed by the command
+executed from detachtty. For local sockets, the same effect can be obtained with
+\fI(echo -e text\'\\r\'; sleep timeout) | attachtty socket-path\fR
 .TP
 .I timeout
-The maximum timeout in seconds (defaults to 1).  This is available
-only for local connections.
+The maximum timeout in seconds (defaults to 1) to wait for the written text
+to be processed. This is available only for local connections.
 
 .PP
 To detach from the tty without exiting from the server process, send
@@ -146,16 +147,22 @@ pathnames for all filename arguments.
 Sending \fBSIGHUP\fR to the process identified by \fIpidname\fR
 will cause detachtty to close and reopen its log files.
 .P
-Sending \fBSIGQUIT\fR to an \fIattachtty\fR process (usually from the
-keyboard with ^\\) will cause it to detach from the tty and quit leaving
-the server process running.  Sometimes you need to press it twice.
+Sending \fBSIGTSTP\fR to an \fIattachtty\fR process (usually
+from the keyboard with ^Z) will cause it to stop itelf,
+leaving the server process running.
+It can be resumed normally with the shell builtin command "fg".
+.P
+Sending \fBSIGQUIT\fR to an \fIattachtty\fR process (usually
+from the keyboard with ^\\) will cause it to detach
+from the tty and quit, leaving the server process running.
+Sometimes you need to press it twice.
 .SH SEE ALSO
 .BR screen (1),
 .BR ssh (1),
-.BR ssh-agent (1),
 .BR sbcl (1).
 .br
 .SH AUTHOR
 Written by Daniel Barlow <dan@telent.net>, and a cast of units.
 Modified by Luca Capello <luca@pca.it>.
 Modified by Mark Huetsch <markhuetsch@gmail.com>.
+Modified by Massimiliano Ghilardi <massimiliano.ghilardi@gmail.com>.
