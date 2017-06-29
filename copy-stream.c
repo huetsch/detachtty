@@ -65,7 +65,7 @@ int send_bytes_and_fd(int out_fd, const char * bytes, int bytes_to_write, int se
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
     cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-    *(int *)CMSG_DATA(cmsg) = send_fd;
+    memcpy(CMSG_DATA(cmsg), &send_fd, sizeof(int));
 
     msg.msg_controllen = cmsg->cmsg_len;
 
@@ -98,12 +98,12 @@ int recv_bytes_and_fd(int in_fd, char * bytes, int bytes_to_read, int * recv_fd)
     cmsg = CMSG_FIRSTHDR(&msg);
     while (cmsg != NULL) {
       if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type  == SCM_RIGHTS) {
-          * recv_fd = *(int *) CMSG_DATA(cmsg);
+          memcpy(recv_fd, CMSG_DATA(cmsg), sizeof(int));
           break;
       }
       cmsg = CMSG_NXTHDR(&msg, cmsg);
     }
-    return bytes_to_read < iov.iov_len ? bytes_to_read : iov.iov_len;
+    return bytes_to_read < (int)iov.iov_len ? bytes_to_read : (int)iov.iov_len;
 }
 #endif /* DETACHTTY_SENDFD_RECVFD */
 

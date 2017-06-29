@@ -370,6 +370,8 @@ static void set_noecho(int fd) {
 #endif
     if (tcsetattr(fd, TCSANOW, &stermios) < 0)
         bail("detach child","tcsetattr error");
+#else
+    (void)fd;
 #endif /* NEED_SET_NOECHO */
 }
 
@@ -392,9 +394,11 @@ static void sighup_signal_handler(int sig) {
 
 static void init_signal_handlers(void) {
     struct  sigaction act;
-    int i, fatal_sig[] = { SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE,
-                           SIGSEGV, /*SIGPIPE,*/ SIGTERM, SIGSTKFLT, SIGCHLD,
-                           SIGXCPU, SIGXFSZ, };
+    int fatal_sig[] = {
+        SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE, SIGSEGV,
+        /*SIGPIPE,*/ SIGTERM, SIGSTKFLT, SIGCHLD, SIGXCPU, SIGXFSZ,
+    };
+    unsigned i;
 
     /* catch SIGCHLD, SIGQUIT, SIGTERM, SIGILL, SIGFPE... and exit */
     act.sa_handler = fatal_signal_handler;

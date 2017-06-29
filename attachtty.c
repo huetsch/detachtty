@@ -57,12 +57,15 @@ void tears_in_the_rain(int signal) {
     cleanup_signal_handler(signal);
 }
 void control_c_pressed(int signal) {
+    (void)signal;
     was_interrupted=1;
 }
 void control_z_pressed(int signal) {
+    (void)signal;
     was_suspended=1;
 }
 void window_resized(int signal) {
+    (void)signal;
     was_resized=1;
 }
 
@@ -93,10 +96,11 @@ void suspend_myself(void) {
 
 static void init_signal_handlers(void) {
     struct sigaction act;
-    int i, fatal_sig[] = {
-        SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE, SIGSEGV, SIGPIPE,
-        SIGTERM, SIGSTKFLT, SIGCHLD, SIGXCPU, SIGXFSZ,
+    int fatal_sig[] = {
+        SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE, SIGSEGV,
+        SIGPIPE, SIGTERM, SIGSTKFLT, SIGCHLD, SIGXCPU, SIGXFSZ,
     };
+    unsigned i;
     
     /* catch SIGINT and send character \003 over the link */
     act.sa_handler=control_c_pressed;
@@ -166,7 +170,7 @@ int cleanup_tty(void) {
     return tcsetattr(0, TCSADRAIN, &saved_tty);
 }
 
-int main(int argc,char *argv[], char *envp[]) {
+int main(int argc, char *argv[]) {
     char *host=NULL;		/* "hostname" or "user@hostname" */
     char *path;			/* path to socket */
     char *p;
