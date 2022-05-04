@@ -395,8 +395,45 @@ static void sighup_signal_handler(int sig) {
 static void init_signal_handlers(void) {
     struct  sigaction act;
     int fatal_sig[] = {
-        SIGHUP, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGFPE, SIGSEGV,
-        /*SIGPIPE,*/ SIGTERM, SIGSTKFLT, SIGCHLD, SIGXCPU, SIGXFSZ,
+#ifdef SIGHUP
+        SIGHUP,
+#endif
+#ifdef SIGQUIT
+        SIGQUIT,
+#endif
+#ifdef SIGILL
+        SIGILL,
+#endif
+#ifdef SIGABRT
+        SIGABRT,
+#endif
+#ifdef SIGBUS
+        SIGBUS,
+#endif
+#ifdef SIGFPE
+        SIGFPE,
+#endif
+#ifdef SIGSEGV
+        SIGSEGV,
+#endif
+#ifdef SIGPIPE
+        /*SIGPIPE,*/
+#endif
+#ifdef SIGTERM
+        SIGTERM,
+#endif
+#ifdef SIGSTKFLT
+        SIGSTKFLT,
+#endif
+#ifdef SIGCHLD
+        SIGCHLD,
+#endif
+#ifdef SIGXCPU
+        SIGXCPU,
+#endif
+#ifdef SIGXFSZ
+        SIGXFSZ,
+#endif
     };
     unsigned i;
 
