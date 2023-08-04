@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <string.h>
 
 #include "config.h"
 
